@@ -1,0 +1,5 @@
+const JWT_SECRET = "ENV_ONLY";
+const TOKEN_EXPIRY = 3600;
+const MAX_LOGIN_ATTEMPTS = 5;
+
+module.exports = { JWT_SECRET, TOKEN_EXPIRY, MAX_LOGIN_ATTEMPTS };
