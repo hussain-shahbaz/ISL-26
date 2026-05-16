@@ -5,18 +5,9 @@
 **/.env
 **/.env.*
 
-# Environment files
-.env
-.env.local
-.env.development
-.env.test
-.env.production
-
-# Build and coverage directories
+# Existing entries
 /dist
 /coverage
-
-# Prisma files
 /prisma/migrations
 /prisma/dev.db
 /prisma/dev.db-journal
@@ -30,6 +21,4 @@
 /prisma/dev.db.backup2-journal
 /prisma/dev.db.backup2-shm
 /prisma/dev.db.backup2-wal
-
-# Lock files
-package-lock.json
+/generated/prisma
