@@ -22,3 +22,7 @@
 /prisma/dev.db.backup2-shm
 /prisma/dev.db.backup2-wal
 /generated/prisma
+/db.js
+/index.js
+/package-lock.json
+/package.json
