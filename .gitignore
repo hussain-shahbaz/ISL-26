@@ -1,4 +1,6 @@
-modules/exam/node_modules
-modules/exam/package-lock.json
-modules/exam/server.js
-modules/exam/app.js
+server/src/modules/.env
+server/src/modules/db.js
+server/src/modules/package-lock.json
+server/src/modules/server.js
+server/src/modules/app.js
+server/src/modules/node_modules
