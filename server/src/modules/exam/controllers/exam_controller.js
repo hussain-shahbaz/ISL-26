@@ -23,6 +23,7 @@ class ExamController {
 
   async getAllExams(req, res) {
     try {
+  
       const { instructorId, subject } = req.query;
 
       let exams;
@@ -30,11 +31,7 @@ class ExamController {
         exams = await examService.getExamsByTeacherAndSubject(instructorId, subject);
       } else if (instructorId) {
         exams = await examService.getExamsByTeacher(instructorId);
-      } else if (subject) {
-        exams = await examService.getExamsBySubject(subject);
-      } else {
-        exams = await examService.getAllExams();
-      }
+      } 
 
       res.status(200).json({ status: 'success', data: exams });
     } catch (err) {
