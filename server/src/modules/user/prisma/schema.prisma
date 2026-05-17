@@ -7,32 +7,71 @@ generator client {
 }
 
 model User {
-  id                 String           @id @default(uuid())
-  name               String           @db.VarChar(100)
-  email              String           @unique @db.VarChar(100)
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
-  role               Role             @default(STUDENT)
-  university         String           @db.VarChar(50) @default("UET")
-  identifier         UserIdentifier? 
-  isDeleted          Boolean          @default(false)
+  id                 String             @id @default(uuid())
+  name               String             @db.VarChar(100)
+  email              String             @unique @db.VarChar(100)
+  hash_password     String             @db.VarChar(255)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  role               Role               @default(STUDENT)
+  
+  // University is optional with "UET" as default
+  // - SUPERADMIN: null (no university context)
+  // - ADMIN: specific university (manages that university)
+  // - INSTRUCTOR: specific university (assigned to teach at that university)
+  // - STUDENT: specific university (studies at that university)
+  university         String?            @db.VarChar(50) @default("UET")
+  
+  identifier         UserIdentifier?
+  isDeleted          Boolean            @default(false)
+  
+  // Approval status for registration workflow
+  // - STUDENT: always APPROVED
+  // - INSTRUCTOR: defaults to PENDING (needs ADMIN approval)
+  // - ADMIN: defaults to PENDING (needs SUPERADMIN approval)
+  approvalStatus     ApprovalStatus     @default(PENDING)
+  approvedAt         DateTime?
+  approvedBy         String?            // ID of user who approved
+  
   @@index([email])
+  @@index([role])
+  @@index([university])
+  @@index([approvalStatus])
+  @@index([role, university])  // For ADMIN queries filtering by role + university
 }
 
 model UserIdentifier {
   id            String @id @default(uuid())
-  identifier    String @unique @db.VarChar(50)
-  department    String  @db.VarChar(100)        
-  degreeProgram String? @db.VarChar(100)        
   
+  // Student/Instructor identifier (e.g., roll number, employee ID)
+  identifier    String @unique @db.VarChar(50)
+  
+  // Department the user belongs to
+  department    String @db.VarChar(100)
+  
+  // Degree program (optional) - e.g., "BS Computer Science"
+  degreeProgram String? @db.VarChar(100)
+  
+  // Batch/Year of study - e.g., 2023, 2024
   batch         Int?
+  
+  // Foreign key to User
   userId        String @unique
   user          User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
   @@index([identifier])
+  @@index([userId])
 }
 
 enum Role {
-  ADMIN
-  STUDENT
-  INSTRUCTOR
+  ADMIN       // University administrator - manages instructors and approvals
+  STUDENT     // Student - no admin rights
+  INSTRUCTOR  // Teacher/Instructor - needs approval from ADMIN
+  SUPERADMIN  // Super administrator - manages all universities and admins
+}
+
+enum ApprovalStatus {
+  PENDING   // Awaiting approval
+  APPROVED  // Approved and active
+  REJECTED  // Rejected registration
 }
