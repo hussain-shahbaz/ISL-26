@@ -24,7 +24,8 @@ class ExamController {
   async getAllExams(req, res) {
     try {
   
-      const { instructorId, subject } = req.query;
+      const { subject } = req.query;
+      const instructorId = req.user.userId
 
       let exams;
       if (instructorId && subject) {

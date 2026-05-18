@@ -51,12 +51,24 @@ class ExamService {
       throw new Error('Published exam cannot be updated');
     }
 
+    if (data.status === 'published' && (!exam.students || exam.students.length === 0)) {
+      throw new Error('Cannot publish exam without students');
+    }
+
+    delete data.instructorId
+
     return await examRepository.updateById(id, data);
   }
 
   async updateStatus(id, newStatus) {
     const exam = await examRepository.findById(id);
+
     if (!exam) throw new Error('Exam not found');
+
+    if (newStatus === 'published' && (!exam.students || exam.students.length === 0)) {
+      throw new Error('Cannot publish exam without students');
+    }
+
     return await examRepository.updateById(id, { status: newStatus });
   }
 
