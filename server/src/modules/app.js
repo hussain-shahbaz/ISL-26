@@ -6,10 +6,10 @@ class App {
   constructor() {
     this.app = express();
     this.app.use(express.json());
-    // this.app.use((req, res, next) => {
-    //   req.user = { userId: '101', role: 'teacher' };
-    //   next();
-    // });
+    this.app.use((req, res, next) => {
+      req.user = { userId: '101', role: 'student' };
+      next();
+    });
     this.app.use('/api/exam', examRoutes.getRouter());
     this.app.use('/api/exam', questionRoutes.getRouter());
   }

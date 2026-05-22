@@ -4,6 +4,10 @@ const examValidator = require('../validators/exam_validator');
 class ExamController {
 
   async createExam(req, res) {
+    if (req.user.role !== 'teacher') {
+      return res.status(403).json({ status: 'error', message: 'Only teachers can create exams' });
+    }
+
     const { isValid, errors } = examValidator.validateCreate(req.body);
     if (!isValid) return res.status(400).json({ status: 'error', errors });
 
