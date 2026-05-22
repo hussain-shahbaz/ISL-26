@@ -7,7 +7,7 @@ class App {
     this.app = express();
     this.app.use(express.json());
     this.app.use((req, res, next) => {
-      req.user = { userId: '101', role: 'student' };
+      req.user = { userId: '101', role: 'teacher' };
       next();
     });
     this.app.use('/api/exam', examRoutes.getRouter());
@@ -20,5 +20,6 @@ class App {
     });
   }
 }
-
+// reference answer ni aana chahiye
+// exam publish krny sy pehly fetch ni ho skta
 module.exports = new App();

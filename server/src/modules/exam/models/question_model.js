@@ -8,7 +8,6 @@ const questionSchema = new mongoose.Schema(
     imageUrl:        { type: String, default: null },
     options:         [{ type: String }],
     marks:           { type: Number, required: true },
-    obtainedMarks:   { type: Number },
     referenceAnswer: { type: String, required: true }
   },
   { timestamps: true }

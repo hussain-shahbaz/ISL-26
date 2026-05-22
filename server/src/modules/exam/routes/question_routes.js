@@ -1,5 +1,6 @@
 const express            = require('express');
 const questionController = require('../controllers/question_controller');
+const questionAuthMiddleware = require('../middleware/question_auth_middleware');
 
 class QuestionRoutes {
   constructor() {
@@ -8,13 +9,17 @@ class QuestionRoutes {
   }
 
   _bindRoutes() {
-    this.router.post('/:examId/questions',      (req, res) => questionController.createQuestion(req, res));
-    this.router.get('/:examId/questions',       (req, res) => questionController.getQuestionsByExam(req, res));
-    this.router.get('/questions/:id',           (req, res) => questionController.getQuestionById(req, res));
-    this.router.patch('/questions/:id',           (req, res) => questionController.updateQuestion(req, res));
-    this.router.delete('/questions/:id',        (req, res) => questionController.deleteQuestion(req, res));
+    const questionAuthMiddleware = require('../middleware/question_auth_middleware');
   }
 
+_bindRoutes() {
+  this.router.post('/:examId',     questionAuthMiddleware.verifyQuestionOwner.bind(questionAuthMiddleware), (req, res) => questionController.createQuestion(req, res));
+  this.router.get('/:examId',      questionAuthMiddleware.verifyQuestionOwner.bind(questionAuthMiddleware), (req, res) => questionController.getQuestionsByExam(req, res));
+  this.router.get('/detail/:id',   questionAuthMiddleware.verifyQuestionOwner.bind(questionAuthMiddleware), (req, res) => questionController.getQuestionById(req, res));
+  this.router.patch('/:id',        questionAuthMiddleware.verifyQuestionOwner.bind(questionAuthMiddleware), (req, res) => questionController.updateQuestion(req, res));
+  this.router.delete('/:id',       questionAuthMiddleware.verifyQuestionOwner.bind(questionAuthMiddleware), (req, res) => questionController.deleteQuestion(req, res));
+}
+  
   getRouter() {
     return this.router;
   }

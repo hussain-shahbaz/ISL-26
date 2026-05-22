@@ -4,6 +4,7 @@ const examValidator = require('../validators/exam_validator');
 class ExamController {
 
   async createExam(req, res) {
+
     if (req.user.role !== 'teacher') {
       return res.status(403).json({ status: 'error', message: 'Only teachers can create exams' });
     }
@@ -49,7 +50,7 @@ class ExamController {
     if (!isValid) return res.status(400).json({ status: 'error', errors });
 
     try {
-      const exam = await examService.getExamWithQuestions(req.params.id);
+      const exam = await examService.getExamWithQuestions(req.params.id, req.user);
       res.status(200).json({ status: 'success', data: exam });
     } catch (err) {
       res.status(404).json({ status: 'error', message: err.message });

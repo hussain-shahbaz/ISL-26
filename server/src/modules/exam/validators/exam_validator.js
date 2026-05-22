@@ -13,18 +13,18 @@ class ExamValidator {
       errors.push('subject is required');
     }
 
+    if (!body.totalMarks || !Number.isInteger(body.totalMarks) || body.totalMarks <= 0) {
+      errors.push('totalMarks is required and must be a positive integer');
+    }
+
     if (!body.scheduledTime) {
       errors.push('scheduledTime is required');
     } else if (new Date(body.scheduledTime) <= new Date()) {
       errors.push('scheduledTime must be a future date');
     }
 
-    if (!body.timeAllowed || body.timeAllowed <= 0) {
-      errors.push('timeAllowed is required and must be greater than 0');
-    }
-
-    if (!body.totalMarks || body.totalMarks <= 0) {
-      errors.push('totalMarks is required and must be greater than 0');
+    if (!body.timeAllowed || !Number.isInteger(body.timeAllowed) || body.timeAllowed <= 0) {
+      errors.push('timeAllowed is required and must be a positive integer');
     }
 
     if (!body.questions || !Array.isArray(body.questions) || body.questions.length === 0) {
@@ -43,6 +43,7 @@ class ExamValidator {
 
   validateUpdate(body) {
     const errors = [];
+    const allowed = ['draft', 'saved', 'published', 'submitted', 'checked'];
 
     if (body.instructorId !== undefined && !Number.isInteger(Number(body.instructorId))) {
       errors.push('instructorId must be an integer');
@@ -56,12 +57,12 @@ class ExamValidator {
       errors.push('scheduledTime must be a future date');
     }
 
-    if (body.timeAllowed !== undefined && body.timeAllowed <= 0) {
-      errors.push('timeAllowed must be greater than 0');
+    if (body.timeAllowed !== undefined && (!Number.isInteger(body.timeAllowed) || body.timeAllowed <= 0)) {
+      errors.push('timeAllowed must be a positive integer');
     }
 
-    if (body.totalMarks !== undefined && body.totalMarks <= 0) {
-      errors.push('totalMarks must be greater than 0');
+    if (body.totalMarks !== undefined && (!Number.isInteger(body.totalMarks) || body.totalMarks <= 0)) {
+      errors.push('totalMarks must be a positive integer');
     }
 
     return { isValid: errors.length === 0, errors };
@@ -69,12 +70,12 @@ class ExamValidator {
 
   validateStatus(body) {
     const errors = [];
-    const allowed = ['draft', 'saved', 'published'];
+    const allowed = ['draft', 'saved', 'published', 'submitted', 'checked'];
 
     if (!body.status) {
       errors.push('status is required');
     } else if (!allowed.includes(body.status)) {
-      errors.push('status must be draft, saved or published');
+      errors.push('status must be draft, saved, published, submitted or checked');
     }
 
     return { isValid: errors.length === 0, errors };
