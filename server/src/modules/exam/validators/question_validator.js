@@ -39,8 +39,8 @@ class QuestionValidator {
       errors.push('questionText cannot be empty');
     }
 
-    if (!body.marks || !Number.isInteger(body.marks) || body.marks <= 0) {
-      errors.push('marks is required and must be a positive integer');
+    if (body.marks !== undefined && (!Number.isInteger(body.marks) || body.marks <= 0)) {
+      errors.push('marks must be a positive integer');
     }
 
     if (body.referenceAnswer !== undefined && body.referenceAnswer.trim() === '') {

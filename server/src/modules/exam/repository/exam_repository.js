@@ -35,6 +35,10 @@ class ExamRepository {
     return await Exam.findById(id);
   }
 
+  async findByIds(ids) {
+    return await Exam.find({ _id: { $in: ids } });
+  }
+
   async updateById(id, data) {
     return await Exam.findByIdAndUpdate(id, data, { new: true });
   }

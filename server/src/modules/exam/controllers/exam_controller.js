@@ -45,15 +45,12 @@ class ExamController {
     }
   }
 
-  async getExamById(req, res) {
-    const { isValid, errors } = examValidator.validateExamId(req.params.id);
-    if (!isValid) return res.status(400).json({ status: 'error', errors });
-
+  async getExamsByStudent(req, res) {
     try {
-      const exam = await examService.getExamWithQuestions(req.params.id, req.user);
-      res.status(200).json({ status: 'success', data: exam });
+      const exams = await examService.getExamsByStudent(req.params.rollNumber);
+      res.status(200).json({ status: 'success', data: exams });
     } catch (err) {
-      res.status(404).json({ status: 'error', message: err.message });
+      res.status(400).json({ status: 'error', message: err.message });
     }
   }
 

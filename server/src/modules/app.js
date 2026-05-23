@@ -20,6 +20,6 @@ class App {
     });
   }
 }
-// reference answer ni aana chahiye
-// exam publish krny sy pehly fetch ni ho skta
+// validate krty waqt role b lena h
+// wo wala kaam b rkna h user roll nuber ky against exam id
 module.exports = new App();

@@ -20,11 +20,35 @@ class QuestionService {
     return result;
   }
 
-  async getQuestionsByExam(examId) {
+  async getQuestionsByExam(examId, user) {
     const exam = await examRepository.findById(examId);
     if (!exam) throw new Error('Exam not found');
 
-    return await questionRepository.findByExamId(examId);
+    if (user.role === 'student') {
+      if (exam.status !== 'published') {
+        throw new Error('Exam is not available');
+      }
+      if (new Date() < new Date(exam.scheduledTime)) {
+        throw new Error('Exam has not started yet');
+      }
+      if (!exam.students.includes(user.userId)) {
+        throw new Error('You are not enrolled in this exam');
+      }
+    }else if(user.role === "teacher"){
+      if(user.userId !== exam.instructorId){
+        throw new Error("Not authorized")
+      }
+    }
+    const questions = await questionRepository.findByExamId(examId);
+    // student ko referenceAnswer nahi dikhna
+    if (user.role === 'student') {
+      return questions.map(q => {
+        const { referenceAnswer, ...safe } = q.toObject();
+        return safe;
+      });
+    }
+
+    return questions;
   }
 
   async getQuestionById(id) {

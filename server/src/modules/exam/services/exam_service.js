@@ -1,5 +1,6 @@
 const examRepository = require('../repository/exam_repository');
 const questionRepository = require('../repository/question_repository');
+const studentExamRepository = require('../repository/student_exam_repository');
 
 class ExamService {
 
@@ -15,28 +16,13 @@ class ExamService {
     return exam;
   }
 
-  async getExamWithQuestions(id, user) {
-      const exam = await examRepository.findByIdWithQuestions(id);
-      if (!exam) throw new Error('Exam not found');
+  async getExamsByStudent(rollNumber) {
+    const studentExams = await studentExamRepository.findByRollNumber(rollNumber);
+    if (!studentExams) return [];
 
-      if (user.role === 'teacher') {
-        return exam;
-      }
-
-      if (user.role === 'student') {
-        if (exam.status !== 'published') {
-          throw new Error('Exam is not available');
-        }
-        if (new Date() < new Date(exam.scheduledTime)) {
-          throw new Error('Exam has not started yet');
-        }
-        if (!exam.students.includes(user.rollNumber)) {
-          throw new Error('You are not enrolled in this exam');
-        }
-      }
-
-      return exam;
-    }
+    const exams = await examRepository.findByIds(studentExams.examIds);
+    return exams;
+  }
 
   async getAllExams() {
     return await examRepository.findAll();
@@ -74,6 +60,18 @@ class ExamService {
 
     delete data.instructorId
     delete data.status
+
+    if (data.students) {
+      const removed = exam.students.filter(r => !data.students.includes(r));
+      const added   = data.students.filter(r => !exam.students.includes(r));
+
+      for (const rollNumber of removed) {
+        await studentExamRepository.removeExamFromStudent(rollNumber, id);
+      }
+      for (const rollNumber of added) {
+        await studentExamRepository.addExamToStudent(rollNumber, id);
+      }
+    }
 
     return await examRepository.updateById(id, data);
   }
@@ -124,8 +122,17 @@ class ExamService {
         throw new Error(`Marks mismatch — exam totalMarks: ${exam.totalMarks}, questions marks: ${totalAssignedMarks}`);
       }
     }
+    const updated = await examRepository.updateById(id, { status: newStatus });
 
-    return await examRepository.updateById(id, { status: newStatus });
+  // publish hone ke baad mapping banao
+    if (newStatus === 'published') {
+      for (const rollNumber of exam.students) {
+        await studentExamRepository.addExamToStudent(rollNumber, id);
+      }
+    }
+
+    return updated;
+
   }
 
   async deleteExam(id) {
@@ -134,6 +141,10 @@ class ExamService {
 
     if (['published', 'submitted', 'checked'].includes(exam.status)) {
       throw new Error('Published, submitted or checked exam cannot be updated');
+    }
+
+    for (const rollNumber of exam.students) {
+      await studentExamRepository.removeExamFromStudent(rollNumber, id);
     }
 
     await questionRepository.deleteByExamId(id);
