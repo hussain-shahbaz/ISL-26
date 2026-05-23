@@ -5,6 +5,10 @@ class QuestionAuthMiddleware {
 
   async verifyQuestionOwner(req, res, next) {
     try {
+      
+      if (req.user.role !== 'teacher') {
+        return res.status(403).json({ status: 'error', message: 'Only teachers can access this' });
+      }
       const instructorId = req.user.userId;
 
       // examId params mein hai (create/getAll)

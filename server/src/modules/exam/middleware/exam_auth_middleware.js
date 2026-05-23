@@ -4,6 +4,10 @@ class ExamAuthMiddleware {
 
   async verifyExamOwner(req, res, next) {
     try {
+
+      if (req.user.role !== 'teacher') {
+        return res.status(403).json({ status: 'error', message: 'Only teachers can access this' });
+      }
       // jwt middleware ny pehly sy req.user set kr diya hoga
       const instructorId = req.user.userId;
 
