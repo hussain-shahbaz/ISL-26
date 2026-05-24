@@ -11,7 +11,7 @@ class App {
       next();
     });
     this.app.use('/api/exam', examRoutes.getRouter());
-    this.app.use('/api/exam', questionRoutes.getRouter());
+    this.app.use('/api/exam/question', questionRoutes.getRouter());
   }
 
   start() {
@@ -20,6 +20,4 @@ class App {
     });
   }
 }
-// validate krty waqt role b lena h
-// wo wala kaam b rkna h user roll nuber ky against exam id
 module.exports = new App();

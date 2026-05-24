@@ -1,6 +1,8 @@
 # Exam API — Integration Guide
 
-All endpoints are prefixed with your base route (e.g. `/api/exams` and `/api/questions`). Every request must carry a valid JWT so the server can populate `req.user` with `userId` and `role`.
+Base URL: `/api/exam`
+
+Every request must carry a valid JWT. The JWT middleware must set `req.user.userId` and `req.user.role` before these routes run.
 
 ---
 
@@ -11,13 +13,11 @@ All endpoints are prefixed with your base route (e.g. `/api/exams` and `/api/que
 | `teacher` | Create, update, delete exams and questions |
 | `student` | Read exams assigned to them; read questions for an exam |
 
-The JWT middleware must set `req.user.userId` and `req.user.role` before these routes run.
-
 ---
 
 ## Exam Endpoints
 
-### `POST /exams`
+### `POST /api/exam`
 Create a new exam with its questions included.
 
 **Role required:** `teacher`
@@ -54,39 +54,24 @@ Create a new exam with its questions included.
 - `totalMarks` — required, positive integer; **must equal the sum of all question `marks`**
 - `scheduledTime` — required ISO date string; must be a future date
 - `timeAllowed` — required, positive integer (minutes)
-- `questions` — required, non-empty array; each question is validated individually (see Question Fields below)
-- `instructorId` and `teacherName` are set server-side from the JWT — do not send them
+- `questions` — required, non-empty array (see [Question Fields](#question-fields))
+- Do **not** send `instructorId` or `teacherName` — set server-side from JWT
 
 **Success `201`:**
 ```json
-{ "status": "success", "data": { } }
+{ "status": "success", "data": {} }
 ```
-
-**Error `400`:**
-```json
-{ "status": "error", "errors": ["totalMarks (50) must equal sum of all question marks (30)"] }
-```
-
-**Error `403`:** User is not a teacher.
 
 ---
 
-### `GET /exams`
-Get exams belonging to the authenticated teacher, optionally filtered by subject.
+### `GET /api/exam`
+Get exams for the authenticated teacher, optionally filtered by subject.
 
 **Role required:** `teacher`
 
-**Query params:**
-
-| Param | Type | Description |
+| Query param | Type | Description |
 |---|---|---|
-| `subject` | string | (optional) Filter exams by subject |
-
-**Examples:**
-```
-GET /exams              → all exams for this teacher
-GET /exams?subject=Math → only Math exams for this teacher
-```
+| `subject` | string | (optional) Filter by subject |
 
 **Success `200`:**
 ```json
@@ -95,13 +80,11 @@ GET /exams?subject=Math → only Math exams for this teacher
 
 ---
 
-### `GET /exams/student`
+### `GET /api/exam/student`
 Get exams assigned to the authenticated student.
 
 **Role required:** `student`
 
-> **Note:** Student roll number is resolved server-side from `req.user.userId`. No query params needed.
-
 **Success `200`:**
 ```json
 { "status": "success", "data": [] }
@@ -109,12 +92,10 @@ Get exams assigned to the authenticated student.
 
 ---
 
-### `PATCH /exams/:id`
-Update exam fields (not status — use the dedicated status endpoint for that).
+### `PATCH /api/exam/:id`
+Update exam fields.
 
 **Role required:** `teacher` (must own the exam)
-
-**URL param:** `:id` — 24-character MongoDB ObjectId
 
 **Request body** (all fields optional):
 ```json
@@ -127,31 +108,24 @@ Update exam fields (not status — use the dedicated status endpoint for that).
 }
 ```
 
-**Field rules:** Same types as create; `scheduledTime` if provided must still be a future date.
-
 **Success `200`:**
 ```json
 { "status": "success", "data": {} }
 ```
 
-**Error `403`:** User is not the exam owner.  
-**Error `404`:** Exam not found.
-
 ---
 
-### `PATCH /exams/:id/status`
+### `PATCH /api/exam/:id/status`
 Update only the status of an exam.
 
 **Role required:** `teacher` (must own the exam)
-
-**URL param:** `:id` — 24-character MongoDB ObjectId
 
 **Request body:**
 ```json
 { "status": "published" }
 ```
 
-**Allowed status values:** `draft` | `saved` | `published` | `submitted` | `checked`
+**Allowed values:** `draft` | `saved` | `published` | `submitted` | `checked`
 
 **Success `200`:**
 ```json
@@ -160,12 +134,10 @@ Update only the status of an exam.
 
 ---
 
-### `DELETE /exams/:id`
-Delete an exam by ID.
+### `DELETE /api/exam/:id`
+Delete an exam.
 
 **Role required:** `teacher` (must own the exam)
-
-**URL param:** `:id` — 24-character MongoDB ObjectId
 
 **Success `200`:**
 ```json
@@ -176,12 +148,10 @@ Delete an exam by ID.
 
 ## Question Endpoints
 
-### `POST /questions/:examId`
+### `POST /api/exam/question/:examId`
 Add a question to an existing exam.
 
 **Role required:** `teacher` (must own the exam)
-
-**URL param:** `:examId` — 24-character MongoDB ObjectId
 
 **Request body:**
 ```json
@@ -195,7 +165,7 @@ Add a question to an existing exam.
 }
 ```
 
-### Question Fields
+#### Question Fields
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -213,14 +183,10 @@ Add a question to an existing exam.
 
 ---
 
-### `GET /questions/question/:examId`
+### `GET /api/exam/question/:examId`
 Get all questions for a specific exam.
 
 **Role required:** `teacher` or `student`
-
-**URL param:** `:examId` — 24-character MongoDB ObjectId
-
-> **Note for students:** Roll number is resolved from `req.user.userId` internally.
 
 **Success `200`:**
 ```json
@@ -229,12 +195,10 @@ Get all questions for a specific exam.
 
 ---
 
-### `PATCH /questions/question/:id`
+### `PATCH /api/exam/question/:id`
 Update a question by its ID.
 
 **Role required:** `teacher` (must own the exam the question belongs to)
-
-**URL param:** `:id` — 24-character MongoDB ObjectId
 
 **Request body** (all fields optional):
 ```json
@@ -253,12 +217,10 @@ Update a question by its ID.
 
 ---
 
-### `DELETE /questions/question/:id`
+### `DELETE /api/exam/question/:id`
 Delete a question by its ID.
 
 **Role required:** `teacher` (must own the exam the question belongs to)
-
-**URL param:** `:id` — 24-character MongoDB ObjectId
 
 **Success `200`:**
 ```json
@@ -276,14 +238,16 @@ Delete a question by its ID.
 | `403` | `{ "status": "error", "message": "..." }` | Wrong role or not the owner |
 | `404` | `{ "status": "error", "message": "..." }` | Resource not found |
 
+All success responses follow: `{ "status": "success", "data": ... }`
+
 ---
 
 ## Data Models
 
 ### Exam
 ```
-instructorId   String   (set from JWT)
-teacherName    String   (set from JWT/service)
+instructorId   String
+teacherName    String
 title          String
 subject        String
 scheduledTime  Date
@@ -312,11 +276,9 @@ updatedAt       Date       (auto)
 
 ## Quick Integration Checklist
 
-- [ ] JWT middleware runs before all exam/question routes and sets `req.user.userId` and `req.user.role`
+- [ ] JWT middleware sets `req.user.userId` and `req.user.role` before these routes
 - [ ] All IDs are 24-character hex MongoDB ObjectIds
-- [ ] `scheduledTime` is sent as a valid future ISO 8601 string
-- [ ] `totalMarks` in `POST /exams` equals the exact sum of all question `marks`
-- [ ] MCQ questions always include exactly 4 `options`
-- [ ] `POST /exams` and `POST /questions/:examId` require role `teacher`
-- [ ] `GET /exams/student` and `GET /questions/question/:examId` are accessible to both roles
-- [ ] Do **not** send `instructorId` or `teacherName` — they are populated server-side
+- [ ] `scheduledTime` is a valid future ISO 8601 string
+- [ ] `totalMarks` equals the exact sum of all question `marks`
+- [ ] MCQ questions always have exactly 4 `options`
+- [ ] Do **not** send `instructorId` or `teacherName` in the body
