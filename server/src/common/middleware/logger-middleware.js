@@ -16,6 +16,7 @@ const loggerMiddleware = (req, res, next) => {
     const service = req.get('x-service') || process.env.SERVICE_NAME || 'main-server';
     const environment = process.env.NODE_ENV || 'development';
     const userId = req.get('x-user-id') || null;
+    
 
     // Log REQUEST
     const requestLog = {
@@ -35,6 +36,7 @@ const loggerMiddleware = (req, res, next) => {
       },
     };
     LogQueue.add(requestLog);
+
 
     // Log RESPONSE
     let responseBody = data;

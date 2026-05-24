@@ -4,7 +4,10 @@
   "description": "This repository is built for a **modular, security-first, industry-style backend**.   The goal is not just to make the app work, but to make the code easy to maintain, test, review, and integrate as a team.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "log": "nodemon src/modules/log/app.js"
   },
   "keywords": [],
   "author": "",
