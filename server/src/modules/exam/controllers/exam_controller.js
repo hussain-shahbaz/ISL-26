@@ -9,6 +9,11 @@ class ExamController {
       return res.status(403).json({ status: 'error', message: 'Only teachers can create exams' });
     }
 
+    req.body.instructorId = req.user.userId;
+
+    //yahan hum call lgaeingy aur teacher id ki base py unka name nikalwa leingy
+    req.body.teacherName = "Sir Nazeef"
+
     const { isValid, errors } = examValidator.validateCreate(req.body);
     if (!isValid) return res.status(400).json({ status: 'error', errors });
 
@@ -47,7 +52,9 @@ class ExamController {
 
   async getExamsByStudent(req, res) {
     try {
-      const exams = await examService.getExamsByStudent(req.params.rollNumber);
+      // yahan py call lagygi aur rollNumber aayega student ki userId ki base py
+      const rollNumber = "roll-001"
+      const exams = await examService.getExamsByStudent(rollNumber);
       res.status(200).json({ status: 'success', data: exams });
     } catch (err) {
       res.status(400).json({ status: 'error', message: err.message });

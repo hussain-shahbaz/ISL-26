@@ -1,593 +1,322 @@
-# Exam Module — API Documentation
+# Exam API — Integration Guide
 
-Ye module online exam system ka part hai. Exams aur questions ka CRUD handle karta hai. User data (teachers/students) alag PostgreSQL service mein hai — ye module sirf MongoDB mein exam data store karta hai.
-
----
-
-## Base URL
-```
-/api/exam
-/api/questions
-```
-
-## Authentication
-Har request mein JWT token hona chahiye. Token se `req.user` set hota hai:
-```
-req.user = { userId, role, rollNumber }
-```
+All endpoints are prefixed with your base route (e.g. `/api/exams` and `/api/questions`). Every request must carry a valid JWT so the server can populate `req.user` with `userId` and `role`.
 
 ---
 
-## Status Flow
-```
-draft ↔ saved ↔ published → submitted ↔ checked
-```
-- `submitted` ya `checked` se wapis `published`, `saved`, `draft` pe nahi ja sakte
-- Publish hone ke baad hi `submitted` ya `checked` ja sakta hai
+## Authentication & Roles
+
+| Role | Access |
+|---|---|
+| `teacher` | Create, update, delete exams and questions |
+| `student` | Read exams assigned to them; read questions for an exam |
+
+The JWT middleware must set `req.user.userId` and `req.user.role` before these routes run.
 
 ---
 
-# EXAM ENDPOINTS
+## Exam Endpoints
 
----
+### `POST /exams`
+Create a new exam with its questions included.
 
-## 1. Create Exam
-**`POST /api/exam`**
+**Role required:** `teacher`
 
-Naya exam banao. Questions bhi saath create hote hain.
-
-**Access:** Sirf `teacher`
-
-**Request Body:**
+**Request body:**
 ```json
 {
-  "instructorId": "101",
   "subject": "Mathematics",
-  "scheduledTime": "2026-06-20T10:00:00.000Z",
-  "timeAllowed": 60,
-  "totalMarks": 10,
-  "students": ["roll-001", "roll-002"],
+  "title": "Mid-Term Exam",
+  "totalMarks": 50,
+  "scheduledTime": "2025-12-01T09:00:00.000Z",
+  "timeAllowed": 90,
   "questions": [
     {
       "type": "mcq",
-      "questionText": "What is the capital of Pakistan?",
-      "marks": 5,
-      "options": ["Lahore", "Karachi", "Islamabad", "Peshawar"],
-      "referenceAnswer": "Islamabad"
+      "questionText": "What is 2 + 2?",
+      "options": ["2", "3", "4", "5"],
+      "referenceAnswer": "4",
+      "marks": 10
     },
     {
       "type": "text",
-      "questionText": "What is Pythagoras theorem?",
-      "marks": 5,
-      "referenceAnswer": "Sum of squares of two sides equals square of hypotenuse"
+      "questionText": "Explain the Pythagorean theorem.",
+      "referenceAnswer": "a² + b² = c²",
+      "marks": 40
     }
   ]
 }
 ```
 
-**Validation Rules:**
-| Field | Rule |
-|---|---|
-| instructorId | Required, integer |
-| subject | Required, non-empty string |
-| scheduledTime | Required, future date |
-| timeAllowed | Required, positive integer (minutes) |
-| totalMarks | Required, positive integer — must equal sum of question marks |
-| students | Required, non-empty array of roll numbers |
-| questions | Required, non-empty array — each question validated separately |
-| questions[].type | Required, `mcq` or `text` |
-| questions[].questionText | Required |
-| questions[].marks | Required, positive integer |
-| questions[].referenceAnswer | Required |
-| questions[].options | Required if type is `mcq`, exactly 4 options |
-| questions[].imageUrl | Optional |
+**Field rules:**
+- `subject` — required, non-empty string
+- `title` — required, non-empty string
+- `totalMarks` — required, positive integer; **must equal the sum of all question `marks`**
+- `scheduledTime` — required ISO date string; must be a future date
+- `timeAllowed` — required, positive integer (minutes)
+- `questions` — required, non-empty array; each question is validated individually (see Question Fields below)
+- `instructorId` and `teacherName` are set server-side from the JWT — do not send them
 
-**Success Response `201`:**
+**Success `201`:**
 ```json
-{
-  "status": "success",
-  "data": {
-    "_id": "64abc123...",
-    "instructorId": "101",
-    "subject": "Mathematics",
-    "scheduledTime": "2026-06-20T10:00:00.000Z",
-    "timeAllowed": 60,
-    "totalMarks": 10,
-    "students": ["roll-001", "roll-002"],
-    "status": "draft",
-    "createdAt": "2026-05-20T08:00:00.000Z",
-    "updatedAt": "2026-05-20T08:00:00.000Z"
-  }
-}
+{ "status": "success", "data": { } }
 ```
 
-**Status Codes:**
-| Code | Reason |
-|---|---|
-| 201 | Exam created successfully |
-| 400 | Validation failed |
-| 403 | Role is not teacher |
+**Error `400`:**
+```json
+{ "status": "error", "errors": ["totalMarks (50) must equal sum of all question marks (30)"] }
+```
+
+**Error `403`:** User is not a teacher.
 
 ---
 
-## 2. Get All Exams (Teacher)
-**`GET /api/exam`**
+### `GET /exams`
+Get exams belonging to the authenticated teacher, optionally filtered by subject.
 
-Token se `instructorId` nikalta hai — teacher sirf apni exams dekhta hai.
+**Role required:** `teacher`
 
-**Access:** Sirf `teacher`
+**Query params:**
 
-**Query Params (Optional):**
-| Param | Description |
-|---|---|
-| subject | Filter by subject |
+| Param | Type | Description |
+|---|---|---|
+| `subject` | string | (optional) Filter exams by subject |
 
-**Example:**
+**Examples:**
 ```
-GET /api/exam
-GET /api/exam?subject=Mathematics
+GET /exams              → all exams for this teacher
+GET /exams?subject=Math → only Math exams for this teacher
 ```
 
-**Success Response `200`:**
+**Success `200`:**
 ```json
-{
-  "status": "success",
-  "data": [
-    {
-      "_id": "64abc123...",
-      "instructorId": "101",
-      "subject": "Mathematics",
-      "scheduledTime": "2026-06-20T10:00:00.000Z",
-      "timeAllowed": 60,
-      "totalMarks": 10,
-      "students": ["roll-001", "roll-002"],
-      "status": "draft"
-    }
-  ]
-}
+{ "status": "success", "data": [] }
 ```
-
-**Status Codes:**
-| Code | Reason |
-|---|---|
-| 200 | Success |
-| 400 | Error fetching exams |
 
 ---
 
-## 3. Get Exams by Student
-**`GET /api/exam/student/:rollNumber`**
+### `GET /exams/student`
+Get exams assigned to the authenticated student.
 
-Student ke roll number se uske saare exams fetch karo (published, submitted, checked).
+**Role required:** `student`
 
-**Access:** Teacher ya Student
+> **Note:** Student roll number is resolved server-side from `req.user.userId`. No query params needed.
 
-**Params:**
-| Param | Description |
-|---|---|
-| rollNumber | Student ka roll number |
-
-**Example:**
-```
-GET /api/exam/student/roll-001
-```
-
-**Success Response `200`:**
+**Success `200`:**
 ```json
-{
-  "status": "success",
-  "data": [
-    {
-      "_id": "64abc123...",
-      "subject": "Mathematics",
-      "scheduledTime": "2026-06-20T10:00:00.000Z",
-      "timeAllowed": 60,
-      "totalMarks": 10,
-      "status": "published"
-    }
-  ]
-}
+{ "status": "success", "data": [] }
 ```
-
-> Agar koi exam nahi mila ya rollNumber exist nahi karta — empty array return hoga, error nahi.
-
-**Status Codes:**
-| Code | Reason |
-|---|---|
-| 200 | Success (empty array bhi 200 hai) |
-| 400 | Server error |
 
 ---
 
-## 4. Update Exam
-**`PATCH /api/exam/:id`**
+### `PATCH /exams/:id`
+Update exam fields (not status — use the dedicated status endpoint for that).
 
-Exam ki info update karo. Sirf `draft` ya `saved` exam update ho sakti hai.
+**Role required:** `teacher` (must own the exam)
 
-**Access:** Sirf exam ka owner `teacher`
+**URL param:** `:id` — 24-character MongoDB ObjectId
 
-**Params:**
-| Param | Description |
-|---|---|
-| id | Exam ka MongoDB ObjectId (24 characters) |
-
-**Request Body (sab optional, jo change karna ho woh bhejo):**
+**Request body** (all fields optional):
 ```json
 {
+  "title": "Updated Title",
   "subject": "Physics",
-  "scheduledTime": "2026-07-01T10:00:00.000Z",
-  "timeAllowed": 90,
-  "totalMarks": 20,
-  "students": ["roll-001", "roll-002", "roll-003"]
+  "totalMarks": 100,
+  "scheduledTime": "2025-12-15T10:00:00.000Z",
+  "timeAllowed": 120
 }
 ```
 
-**Rules:**
-- `instructorId` update nahi ho sakta — ignore kiya jayega
-- `status` update nahi ho sakta — alag endpoint use karo
-- `published`, `submitted`, `checked` exam update nahi ho sakti
+**Field rules:** Same types as create; `scheduledTime` if provided must still be a future date.
 
-**Success Response `200`:**
+**Success `200`:**
 ```json
-{
-  "status": "success",
-  "data": {
-    "_id": "64abc123...",
-    "subject": "Physics",
-    "totalMarks": 20,
-    "status": "draft"
-  }
-}
+{ "status": "success", "data": {} }
 ```
 
-**Status Codes:**
-| Code | Reason |
-|---|---|
-| 200 | Updated successfully |
-| 400 | Validation failed ya exam published/submitted/checked hai |
-| 403 | Not authorized — ye teri exam nahi |
-| 404 | Exam not found |
+**Error `403`:** User is not the exam owner.  
+**Error `404`:** Exam not found.
 
 ---
 
-## 5. Update Status
-**`PATCH /api/exam/:id/status`**
+### `PATCH /exams/:id/status`
+Update only the status of an exam.
 
-Exam ka status update karo.
+**Role required:** `teacher` (must own the exam)
 
-**Access:** Sirf exam ka owner `teacher`
+**URL param:** `:id` — 24-character MongoDB ObjectId
 
-**Params:**
-| Param | Description |
-|---|---|
-| id | Exam ka MongoDB ObjectId |
-
-**Request Body:**
+**Request body:**
 ```json
-{
-  "status": "saved"
-}
+{ "status": "published" }
 ```
 
-**Status Rules:**
-- `draft` ↔ `saved` ↔ `published` — aage peeche ja sakte hain
-- `published` → `submitted` ja sakta hai
-- `submitted` ↔ `checked` — aage peeche ja sakte hain
-- `submitted` ya `checked` → `published`, `saved`, `draft` — nahi ja sakta
-- Publish hone ke baad hi `submitted` ya `checked` ja sakta hai
+**Allowed status values:** `draft` | `saved` | `published` | `submitted` | `checked`
 
-**Publish Hone Ke Liye Zaruri:**
-- `subject` hona chahiye
-- `scheduledTime` future mein honi chahiye
-- `timeAllowed` positive integer hona chahiye
-- `totalMarks` positive integer hona chahiye
-- `students` array empty nahi honi chahiye
-- Kam az kam ek question honi chahiye
-- Questions ke total marks === exam totalMarks
-
-**Success Response `200`:**
+**Success `200`:**
 ```json
-{
-  "status": "success",
-  "data": {
-    "_id": "64abc123...",
-    "status": "published"
-  }
-}
+{ "status": "success", "data": {} }
 ```
-
-**Status Codes:**
-| Code | Reason |
-|---|---|
-| 200 | Status updated |
-| 400 | Invalid status ya publish conditions fail |
-| 403 | Not authorized |
-| 404 | Exam not found |
 
 ---
 
-## 6. Delete Exam
-**`DELETE /api/exam/:id`**
+### `DELETE /exams/:id`
+Delete an exam by ID.
 
-Exam delete karo. Saath uski saari questions bhi delete ho jaati hain.
+**Role required:** `teacher` (must own the exam)
 
-**Access:** Sirf exam ka owner `teacher`
+**URL param:** `:id` — 24-character MongoDB ObjectId
 
-**Params:**
-| Param | Description |
-|---|---|
-| id | Exam ka MongoDB ObjectId |
-
-**Rules:**
-- `published`, `submitted`, `checked` exam delete nahi ho sakti
-
-**Success Response `200`:**
+**Success `200`:**
 ```json
-{
-  "status": "success",
-  "message": "Exam deleted successfully"
-}
+{ "status": "success", "message": "Exam deleted successfully" }
 ```
 
-**Status Codes:**
-| Code | Reason |
-|---|---|
-| 200 | Deleted successfully |
-| 400 | Exam published/submitted/checked hai |
-| 403 | Not authorized |
-| 404 | Exam not found |
-
 ---
 
-# QUESTION ENDPOINTS
+## Question Endpoints
 
----
+### `POST /questions/:examId`
+Add a question to an existing exam.
 
-## 7. Create Question
-**`POST /api/questions/:examId`**
+**Role required:** `teacher` (must own the exam)
 
-Existing exam mein naya question add karo. Exam ka `totalMarks` automatically update hoga.
+**URL param:** `:examId` — 24-character MongoDB ObjectId
 
-**Access:** Sirf exam ka owner `teacher`
-
-**Params:**
-| Param | Description |
-|---|---|
-| examId | Exam ka MongoDB ObjectId |
-
-**Request Body (MCQ):**
+**Request body:**
 ```json
 {
   "type": "mcq",
-  "questionText": "What is the speed of light?",
+  "questionText": "Which planet is closest to the sun?",
+  "options": ["Earth", "Mars", "Mercury", "Venus"],
+  "referenceAnswer": "Mercury",
   "marks": 5,
-  "options": ["3x10^6", "3x10^8", "3x10^10", "3x10^12"],
-  "referenceAnswer": "3x10^8",
-  "imageUrl": "https://example.com/image.png"
+  "imageUrl": "https://example.com/planet.jpg"
 }
 ```
 
-**Request Body (Text):**
+### Question Fields
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `type` | string | Yes | `"mcq"` or `"text"` |
+| `questionText` | string | Yes | Non-empty |
+| `referenceAnswer` | string | Yes | Non-empty |
+| `marks` | integer | Yes | Positive integer |
+| `options` | string[] | MCQ only | Exactly 4 items |
+| `imageUrl` | string | No | Optional image URL |
+
+**Success `201`:**
 ```json
-{
-  "type": "text",
-  "questionText": "Define Newton's second law",
-  "marks": 5,
-  "referenceAnswer": "Force equals mass times acceleration"
-}
+{ "status": "success", "data": {} }
 ```
-
-**Validation Rules:**
-| Field | Rule |
-|---|---|
-| type | Required, `mcq` or `text` |
-| questionText | Required |
-| marks | Required, positive integer |
-| referenceAnswer | Required |
-| options | Required if mcq, exactly 4 |
-| imageUrl | Optional |
-
-**Rules:**
-- `published`, `submitted`, `checked` exam mein question add nahi ho sakta
-- Question add hone pe exam ka `totalMarks` automatically update hoga
-
-**Success Response `201`:**
-```json
-{
-  "status": "success",
-  "data": {
-    "_id": "64xyz789...",
-    "examId": "64abc123...",
-    "type": "mcq",
-    "questionText": "What is the speed of light?",
-    "marks": 5,
-    "options": ["3x10^6", "3x10^8", "3x10^10", "3x10^12"],
-    "referenceAnswer": "3x10^8"
-  }
-}
-```
-
-**Status Codes:**
-| Code | Reason |
-|---|---|
-| 201 | Question created |
-| 400 | Validation failed ya exam locked hai |
-| 403 | Not authorized |
-| 404 | Exam not found |
 
 ---
 
-## 8. Get Questions by Exam
-**`GET /api/questions/question/:examId`**
+### `GET /questions/question/:examId`
+Get all questions for a specific exam.
 
-Exam ki saari questions fetch karo.
+**Role required:** `teacher` or `student`
 
-**Access:** Teacher (owner) ya Student (enrolled, exam published aur started)
+**URL param:** `:examId` — 24-character MongoDB ObjectId
 
-**Params:**
-| Param | Description |
-|---|---|
-| examId | Exam ka MongoDB ObjectId |
+> **Note for students:** Roll number is resolved from `req.user.userId` internally.
 
-**Teacher Response `200`:** Saari fields milti hain including `referenceAnswer`
-
-**Student Response `200`:** `referenceAnswer` strip ho jata hai
-
-**Student Ke Liye Conditions:**
-- Exam `published` honi chahiye
-- `scheduledTime` guzar chuka ho
-- Student `students` array mein hona chahiye
-
-**Success Response `200`:**
+**Success `200`:**
 ```json
-{
-  "status": "success",
-  "data": [
-    {
-      "_id": "64xyz789...",
-      "examId": "64abc123...",
-      "type": "mcq",
-      "questionText": "What is the capital of Pakistan?",
-      "marks": 5,
-      "options": ["Lahore", "Karachi", "Islamabad", "Peshawar"]
-    }
-  ]
-}
+{ "status": "success", "data": [] }
 ```
-
-**Status Codes:**
-| Code | Reason |
-|---|---|
-| 200 | Success |
-| 400 | Exam not available ya student enrolled nahi |
-| 403 | Not authorized (teacher ka case) |
-| 404 | Exam not found |
 
 ---
 
-## 9. Update Question
-**`PATCH /api/questions/question/:id`**
+### `PATCH /questions/question/:id`
+Update a question by its ID.
 
-Question update karo. Marks update hone pe exam ka `totalMarks` automatically update hoga.
+**Role required:** `teacher` (must own the exam the question belongs to)
 
-**Access:** Sirf exam ka owner `teacher`
+**URL param:** `:id` — 24-character MongoDB ObjectId
 
-**Params:**
-| Param | Description |
-|---|---|
-| id | Question ka MongoDB ObjectId |
-
-**Request Body (sab optional):**
+**Request body** (all fields optional):
 ```json
 {
   "questionText": "Updated question text",
+  "referenceAnswer": "Updated answer",
   "marks": 10,
-  "options": ["A", "B", "C", "D"],
-  "referenceAnswer": "B"
+  "options": ["A", "B", "C", "D"]
 }
 ```
 
-**Rules:**
-- `examId` update nahi ho sakta — ignore kiya jayega
-- `published`, `submitted`, `checked` exam ka question update nahi ho sakta
-- Marks update hone pe exam ka `totalMarks` automatically update hoga
-
-**Success Response `200`:**
+**Success `200`:**
 ```json
-{
-  "status": "success",
-  "data": {
-    "_id": "64xyz789...",
-    "questionText": "Updated question text",
-    "marks": 10
-  }
-}
-```
-
-**Status Codes:**
-| Code | Reason |
-|---|---|
-| 200 | Updated successfully |
-| 400 | Validation failed ya exam locked |
-| 403 | Not authorized |
-| 404 | Question not found |
-
----
-
-## 10. Delete Question
-**`DELETE /api/questions/question/:id`**
-
-Question delete karo. Exam ka `totalMarks` automatically update hoga.
-
-**Access:** Sirf exam ka owner `teacher`
-
-**Params:**
-| Param | Description |
-|---|---|
-| id | Question ka MongoDB ObjectId |
-
-**Rules:**
-- `published`, `submitted`, `checked` exam ka question delete nahi ho sakta
-- Delete hone pe exam ka `totalMarks` automatically update hoga
-
-**Success Response `200`:**
-```json
-{
-  "status": "success",
-  "message": "Question deleted successfully"
-}
-```
-
-**Status Codes:**
-| Code | Reason |
-|---|---|
-| 200 | Deleted successfully |
-| 400 | Exam locked hai |
-| 403 | Not authorized |
-| 404 | Question not found |
-
----
-
-# Common Error Responses
-
-**400 — Validation Error:**
-```json
-{
-  "status": "error",
-  "errors": ["subject is required", "timeAllowed must be a positive integer"]
-}
-```
-
-**403 — Not Authorized:**
-```json
-{
-  "status": "error",
-  "message": "Not authorized"
-}
-```
-
-**404 — Not Found:**
-```json
-{
-  "status": "error",
-  "message": "Exam not found"
-}
+{ "status": "success", "data": {} }
 ```
 
 ---
 
-# totalMarks Auto-Update Logic
+### `DELETE /questions/question/:id`
+Delete a question by its ID.
 
-| Operation | Effect on totalMarks |
-|---|---|
-| Question add | `totalMarks + newQuestion.marks` |
-| Question update (marks changed) | `totalMarks + (newMarks - oldMarks)` |
-| Question delete | `totalMarks - deletedQuestion.marks` |
+**Role required:** `teacher` (must own the exam the question belongs to)
+
+**URL param:** `:id` — 24-character MongoDB ObjectId
+
+**Success `200`:**
+```json
+{ "status": "success", "message": "Question deleted successfully" }
+```
 
 ---
 
-# Student Exam Mapping
+## Common Error Responses
 
-Jab exam publish hoti hai — har enrolled student ke liye `StudentExam` collection mein `examId` add ho jata hai. Isse student ki exams O(log n) mein fetch hoti hain instead of scanning har exam ki students array.
+| Status | Shape | When |
+|---|---|---|
+| `400` | `{ "status": "error", "errors": [...] }` | Validation failure |
+| `400` | `{ "status": "error", "message": "..." }` | Service/DB error |
+| `403` | `{ "status": "error", "message": "..." }` | Wrong role or not the owner |
+| `404` | `{ "status": "error", "message": "..." }` | Resource not found |
 
-Jab students list update hoti hai — removed students ke mapping se `examId` hata diya jata hai aur naye students ke mapping mein add kar diya jata hai.
+---
+
+## Data Models
+
+### Exam
+```
+instructorId   String   (set from JWT)
+teacherName    String   (set from JWT/service)
+title          String
+subject        String
+scheduledTime  Date
+timeAllowed    Number   (minutes)
+totalMarks     Number
+students       String[]
+status         "draft" | "saved" | "published" | "submitted" | "checked"
+createdAt      Date     (auto)
+updatedAt      Date     (auto)
+```
+
+### Question
+```
+examId          ObjectId → Exam
+type            "mcq" | "text"
+questionText    String
+imageUrl        String | null
+options         String[]   (4 items, MCQ only)
+marks           Number
+referenceAnswer String
+createdAt       Date       (auto)
+updatedAt       Date       (auto)
+```
+
+---
+
+## Quick Integration Checklist
+
+- [ ] JWT middleware runs before all exam/question routes and sets `req.user.userId` and `req.user.role`
+- [ ] All IDs are 24-character hex MongoDB ObjectIds
+- [ ] `scheduledTime` is sent as a valid future ISO 8601 string
+- [ ] `totalMarks` in `POST /exams` equals the exact sum of all question `marks`
+- [ ] MCQ questions always include exactly 4 `options`
+- [ ] `POST /exams` and `POST /questions/:examId` require role `teacher`
+- [ ] `GET /exams/student` and `GET /questions/question/:examId` are accessible to both roles
+- [ ] Do **not** send `instructorId` or `teacherName` — they are populated server-side

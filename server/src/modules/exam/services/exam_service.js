@@ -122,6 +122,15 @@ class ExamService {
         throw new Error(`Marks mismatch — exam totalMarks: ${exam.totalMarks}, questions marks: ${totalAssignedMarks}`);
       }
     }
+
+    // agar published exam ko hata rhy hony tou kya hoga
+
+    if (exam.status === 'published' && newStatus !== 'published') {
+      for (const rollNumber of exam.students) {
+        await studentExamRepository.removeExamFromStudent(rollNumber, id);
+      }
+    }
+
     const updated = await examRepository.updateById(id, { status: newStatus });
 
   // publish hone ke baad mapping banao

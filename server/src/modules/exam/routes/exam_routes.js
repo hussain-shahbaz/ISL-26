@@ -11,7 +11,7 @@ class ExamRoutes {
   _bindRoutes() {
     this.router.post('/',                             (req, res) => examController.createExam(req, res)); //body
     this.router.get('/',                              (req, res) => examController.getAllExams(req, res)); //params and query
-    this.router.get('/student/:rollNumber',                           (req, res) => examController.getExamsByStudent(req, res));// isy change karlena h
+    this.router.get('/student',                       (req, res) => examController.getExamsByStudent(req, res));
     
     this.router.patch('/:id',        examAuthMiddleware.verifyExamOwner.bind(examAuthMiddleware), (req, res) => examController.updateExam(req, res));
     this.router.patch('/:id/status', examAuthMiddleware.verifyExamOwner.bind(examAuthMiddleware), (req, res) => examController.updateStatus(req, res));

@@ -13,6 +13,10 @@ class ExamValidator {
       errors.push('subject is required');
     }
 
+    if (!body.title || body.title.trim() === '') {
+      errors.push('title is required');
+    }
+
     if (!body.totalMarks || !Number.isInteger(body.totalMarks) || body.totalMarks <= 0) {
       errors.push('totalMarks is required and must be a positive integer');
     }
@@ -47,6 +51,10 @@ class ExamValidator {
 
     if (body.instructorId !== undefined && !Number.isInteger(Number(body.instructorId))) {
       errors.push('instructorId must be an integer');
+    }
+
+    if (body.title !== undefined && body.title.trim() === '') {
+      errors.push('title cannot be empty');
     }
 
     if (body.subject !== undefined && body.subject.trim() === '') {

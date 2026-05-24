@@ -31,8 +31,8 @@ class QuestionService {
       if (new Date() < new Date(exam.scheduledTime)) {
         throw new Error('Exam has not started yet');
       }
-      if (!exam.students.includes(user.userId)) {
-        throw new Error('You are not enrolled in this exam');
+      if (!exam.students.includes(user.rollNumber)) {
+        throw new Error('You are not allowed in this exam');
       }
     }else if(user.role === "teacher"){
       if(user.userId !== exam.instructorId){

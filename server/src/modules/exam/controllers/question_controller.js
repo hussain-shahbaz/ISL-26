@@ -23,6 +23,8 @@ class QuestionController {
     if (!isValid) return res.status(400).json({ status: 'error', errors });
 
     try {
+      // yahan call lagygai aur rollNumber niklaeingy
+      req.user.rollNumber = "roll-001"
       const questions = await questionService.getQuestionsByExam(req.params.examId, req.user);
       res.status(200).json({ status: 'success', data: questions });
     } catch (err) {
