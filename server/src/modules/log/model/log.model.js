@@ -49,14 +49,14 @@ const logSchema = new mongoose.Schema(
         query: { type: Object, default: {} },
         params: { type: Object, default: {} },
         headers: Object, // sanitize before saving
-        body: Object, // sanitize before saving
+        body: Object,
         ip: String,
         userId: { type: String, index: true },
         userAgent: String
       },
       default: {}
     },
-
+ 
     response: {
       type: {
         statusCode: Number,
@@ -107,52 +107,37 @@ logSchema.index({ 'request.userId': 1, timestamp: -1 });
 logSchema.index({ service: 1, currentHash: 1 });
 logSchema.index({ eventType: 1, timestamp: -1 });
 
-// Pre-save: Calculate hash for immutability proof
-logSchema.pre('save', async function (next) {
-  try {
-    if (!this.currentHash) {
-      const logData = JSON.stringify({
-        eventType: this.eventType,
-        requestId: this.requestId,
-        timestamp: this.timestamp,
-        service: this.service,
-        environment: this.environment,
-        request: this.request || {},
-        response: this.response || {},
-        error: this.error || {},
-        metadata: this.metadata || {}
-      });
-
-      this.currentHash = crypto
-        .createHash('sha256')
-        .update(this.previousHash + logData)
-        .digest('hex');
-    }
-    next();
-  } catch (error) {
-    next(error);
+// Pre-save: Validate hash is present (service layer calculates it)
+logSchema.pre('save', async function() {
+  // Hash should be calculated by service layer BEFORE reaching here
+  // This is just a safety check - if hash missing, don't save
+  if (!this.currentHash) {
+    throw new Error('currentHash must be calculated before save');
+  }
+  if (!this.previousHash) {
+    throw new Error('previousHash must be set before save');
   }
 });
 
 // Instance method: Verify hash integrity
-logSchema.methods.verifyHash = () => {
+logSchema.methods.verifyHash = function () {
   if (!this.currentHash || !this.previousHash) return false;
 
-  const logData = JSON.stringify({
+  const logData = {
     eventType: this.eventType,
     requestId: this.requestId,
-    timestamp: this.timestamp,
+    timestamp: this.timestamp.toISOString(),
     service: this.service,
     environment: this.environment,
     request: this.request || {},
     response: this.response || {},
     error: this.error || {},
-    metadata: this.metadata || {}
-  });
+  };
 
+  const crypto = require('crypto');
   const expectedHash = crypto
     .createHash('sha256')
-    .update(this.previousHash + logData)
+    .update(this.previousHash + JSON.stringify(logData))
     .digest('hex');
 
   return expectedHash === this.currentHash;
@@ -174,9 +159,10 @@ logSchema.methods.getSummary = function () {
   };
 };
 
-// Static method: Generate genesis hash
+// Static method: Generate genesis hash (for reference only)
 logSchema.statics.generateGenesisHash = function (serviceName) {
-  const genesisData = `genesis-${serviceName}-${Date.now()}`;
+  const crypto = require('crypto');
+  const genesisData = `GENESIS-${serviceName}-${Date.now()}`;
   return crypto.createHash('sha256').update(genesisData).digest('hex');
 };
 

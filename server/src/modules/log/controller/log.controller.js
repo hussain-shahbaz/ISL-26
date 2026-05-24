@@ -6,6 +6,8 @@ const logger = require('../utils/logger');
 class LogController {
   async createLog(req, res) {
     try {
+      console.log('Received log data:', req.body);
+      console.log("POSSIBLE IP", req.headers["x-forwarded-for"] || req.connection.remoteAddress);
       const result = await LogService.captureLog(req.body);
       return res.status(result.statusCode).json(result);
     } catch (error) {
