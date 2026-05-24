@@ -1,4 +1,4 @@
-xconst questionValidator = require('./question_validator');
+const questionValidator = require('./question_validator');
 
 class ExamValidator {
 
@@ -65,21 +65,12 @@ class ExamValidator {
       errors.push('scheduledTime must be a future date');
     }
 
-<<<<<<< HEAD
-    if (body.timeAllowed !== undefined && body.timeAllowed <= 0) {
-      errors.push('timeAllowed must be greater than 0');
-    }
-
-    if (body.totalMarks !== undefined && body.totalMarks <= 0) {
-      errors.push('totalMarks must be greater than 0');
-=======
     if (body.timeAllowed !== undefined && (!Number.isInteger(body.timeAllowed) || body.timeAllowed <= 0)) {
       errors.push('timeAllowed must be a positive integer');
     }
 
     if (body.totalMarks !== undefined && (!Number.isInteger(body.totalMarks) || body.totalMarks <= 0)) {
       errors.push('totalMarks must be a positive integer');
->>>>>>> exam-module
     }
 
     return { isValid: errors.length === 0, errors };
@@ -87,20 +78,12 @@ class ExamValidator {
 
   validateStatus(body) {
     const errors = [];
-<<<<<<< HEAD
-    const allowed = ['draft', 'saved', 'published'];
-=======
     const allowed = ['draft', 'saved', 'published', 'submitted', 'checked'];
->>>>>>> exam-module
 
     if (!body.status) {
       errors.push('status is required');
     } else if (!allowed.includes(body.status)) {
-<<<<<<< HEAD
-      errors.push('status must be draft, saved or published');
-=======
       errors.push('status must be draft, saved, published, submitted or checked');
->>>>>>> exam-module
     }
 
     return { isValid: errors.length === 0, errors };

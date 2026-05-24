@@ -39,13 +39,8 @@ class QuestionValidator {
       errors.push('questionText cannot be empty');
     }
 
-<<<<<<< HEAD
-    if (body.marks !== undefined && body.marks <= 0) {
-      errors.push('marks must be greater than 0');
-=======
     if (body.marks !== undefined && (!Number.isInteger(body.marks) || body.marks <= 0)) {
       errors.push('marks must be a positive integer');
->>>>>>> exam-module
     }
 
     if (body.referenceAnswer !== undefined && body.referenceAnswer.trim() === '') {

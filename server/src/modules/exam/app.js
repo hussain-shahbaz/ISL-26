@@ -1,6 +1,6 @@
 const express        = require('express');
-const examRoutes     = require('./exam/routes/exam_routes');
-const questionRoutes = require('./exam/routes/question_routes');
+const examRoutes     = require('./routes/exam_routes');
+const questionRoutes = require('./routes/question_routes');
 
 class App {
   constructor() {
