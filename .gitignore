@@ -1,3 +1,5 @@
 server/src/modules/.env
 server/src/modules/package-lock.json
 server/src/modules/node_modules
+.env
+node_modules
