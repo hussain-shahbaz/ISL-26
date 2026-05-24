@@ -11,12 +11,12 @@ class QuestionValidator {
       errors.push('questionText is required');
     }
 
-    if (!body.marks || body.marks <= 0) {
-      errors.push('marks is required and must be greater than 0');
-    }
-
     if (!body.referenceAnswer || body.referenceAnswer.trim() === '') {
       errors.push('referenceAnswer is required');
+    }
+
+    if (!body.marks || !Number.isInteger(body.marks) || body.marks <= 0) {
+      errors.push('marks is required and must be a positive integer');
     }
 
     if (body.type === 'mcq') {
@@ -39,8 +39,13 @@ class QuestionValidator {
       errors.push('questionText cannot be empty');
     }
 
+<<<<<<< HEAD
     if (body.marks !== undefined && body.marks <= 0) {
       errors.push('marks must be greater than 0');
+=======
+    if (body.marks !== undefined && (!Number.isInteger(body.marks) || body.marks <= 0)) {
+      errors.push('marks must be a positive integer');
+>>>>>>> exam-module
     }
 
     if (body.referenceAnswer !== undefined && body.referenceAnswer.trim() === '') {

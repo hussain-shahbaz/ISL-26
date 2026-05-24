@@ -1,5 +1,6 @@
 const express        = require('express');
 const examController = require('../controllers/exam_controller');
+const examAuthMiddleware = require('../middleware/exam_auth_middleware');
 
 class ExamRoutes {
   constructor() {
@@ -8,12 +9,13 @@ class ExamRoutes {
   }
 
   _bindRoutes() {
-    this.router.post('/',                (req, res) => examController.createExam(req, res));
-    this.router.get('/',                 (req, res) => examController.getAllExams(req, res));
-    this.router.get('/:id',              (req, res) => examController.getExamById(req, res));
-    this.router.patch('/:id',            (req, res) => examController.updateExam(req, res));
-    this.router.patch('/:id/status',     (req, res) => examController.updateStatus(req, res));
-    this.router.delete('/:id',           (req, res) => examController.deleteExam(req, res));
+    this.router.post('/',                             (req, res) => examController.createExam(req, res)); //body
+    this.router.get('/',                              (req, res) => examController.getAllExams(req, res)); //params and query
+    this.router.get('/student',                       (req, res) => examController.getExamsByStudent(req, res));
+    
+    this.router.patch('/:id',        examAuthMiddleware.verifyExamOwner.bind(examAuthMiddleware), (req, res) => examController.updateExam(req, res));
+    this.router.patch('/:id/status', examAuthMiddleware.verifyExamOwner.bind(examAuthMiddleware), (req, res) => examController.updateStatus(req, res));
+    this.router.delete('/:id',       examAuthMiddleware.verifyExamOwner.bind(examAuthMiddleware), (req, res) => examController.deleteExam(req, res));
   }
 
   getRouter() {

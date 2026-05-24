@@ -4,6 +4,16 @@ const examValidator = require('../validators/exam_validator');
 class ExamController {
 
   async createExam(req, res) {
+
+    if (req.user.role !== 'teacher') {
+      return res.status(403).json({ status: 'error', message: 'Only teachers can create exams' });
+    }
+
+    req.body.instructorId = req.user.userId;
+
+    //yahan hum call lgaeingy aur teacher id ki base py unka name nikalwa leingy
+    req.body.teacherName = "Sir Nazeef"
+
     const { isValid, errors } = examValidator.validateCreate(req.body);
     if (!isValid) return res.status(400).json({ status: 'error', errors });
 
@@ -24,7 +34,8 @@ class ExamController {
   async getAllExams(req, res) {
     try {
   
-      const { instructorId, subject } = req.query;
+      const { subject } = req.query;
+      const instructorId = req.user.userId
 
       let exams;
       if (instructorId && subject) {
@@ -39,15 +50,14 @@ class ExamController {
     }
   }
 
-  async getExamById(req, res) {
-    const { isValid, errors } = examValidator.validateExamId(req.params.id);
-    if (!isValid) return res.status(400).json({ status: 'error', errors });
-
+  async getExamsByStudent(req, res) {
     try {
-      const exam = await examService.getExamWithQuestions(req.params.id);
-      res.status(200).json({ status: 'success', data: exam });
+      // yahan py call lagygi aur rollNumber aayega student ki userId ki base py
+      const rollNumber = "roll-001"
+      const exams = await examService.getExamsByStudent(rollNumber);
+      res.status(200).json({ status: 'success', data: exams });
     } catch (err) {
-      res.status(404).json({ status: 'error', message: err.message });
+      res.status(400).json({ status: 'error', message: err.message });
     }
   }
 

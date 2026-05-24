@@ -9,3 +9,7 @@ server/src/modules/node_modules*/*node_modules*/*
 *.DS_Store
 */node_modules/*
 node_modules/
+server/src/modules/package-lock.json
+server/src/modules/node_modules
+.env
+node_modules
