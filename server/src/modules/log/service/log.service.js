@@ -2,7 +2,7 @@
 
 const LogRepository = require('../repository/log.repository');
 const { sanitize } = require('../utils/sanitizer');
-const { verifyHash } = require('../utils/hash-utils');
+const { verifyHash,calculateLogHash } = require('../utils/hash-utils');
 const logger = require('../utils/logger');
 const config = require('../config/config');
 
@@ -20,15 +20,33 @@ class LogService {
         response: sanitize(logData.response),
         error: logData.error ? sanitize(logData.error) : null,
       };
-
+      
       const previousLog = await LogRepository.getLastLog(
         logData.service,
         logData.environment
       );
 
+      // Extract log data (WITHOUT hash fields or metadata) for hashing
+      const logDataForHashing = {
+        eventType: sanitized.eventType,
+        requestId: sanitized.requestId,
+        timestamp: sanitized.timestamp.toISOString(), // Convert to consistent ISO string
+        service: sanitized.service,
+        environment: sanitized.environment,
+        request: sanitized.request,
+        response: sanitized.response,
+        error: sanitized.error,
+      };
+
       if (previousLog) {
         sanitized.previousHash = previousLog.currentHash;
+      } else {
+        // Genesis: previousHash is special marker
+        sanitized.previousHash = calculateLogHash(config.GENESIS_MARKER + '-' + logData.service, config.GENESIS_MARKER);
       }
+
+      // Calculate currentHash ONLY from previousHash + logData (not including hash fields)
+      sanitized.currentHash = calculateLogHash(sanitized.previousHash, logDataForHashing);
 
       const saved = await LogRepository.create(sanitized);
 
