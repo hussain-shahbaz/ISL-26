@@ -43,7 +43,7 @@ authRouter.get(
   controller.sessions
 );
 // LOGOUT
-authRouter.post("/logout", controller.logout);
+authRouter.post("/logout",authMiddleware, controller.logout);
 // LOGOUT ALL
 authRouter.post(
   "/logout-all",

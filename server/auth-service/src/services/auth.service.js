@@ -6,6 +6,7 @@ import { EmailService } from "./email.service.js";
 import { VerificationRepository } from "../repositories/verification.repository.js";
 import { blacklistToken } from "../utils/jwt.js";
 import { generateOTP } from "../utils/otp.js";
+import crypt from "crypto";
 import {
   generateAccessToken,
   generateRefreshToken,
@@ -69,9 +70,11 @@ export class AuthService {
       userId: user.userId,
       role: user.role,
       sessionId,
+      jti: crypto.randomUUID(),
     });
     const refreshToken = generateRefreshToken({
       userId: user.userId,
+      role: user.role,
       sessionId,
     });
     const refreshTokenHash = await hashValue(refreshToken);
@@ -165,6 +168,7 @@ export class AuthService {
       userId: user.userId,
       role: user.role,
       sessionId: session.sessionId,
+      jti: crypto.randomUUID(),
     });
   }
   async getMe(userId) {
@@ -173,37 +177,72 @@ export class AuthService {
   async getSessions(userId) {
     return sessionRepo.getUserSessions(userId);
   }
-  async logout(refreshToken) {
-    if (!refreshToken) {
-      throw new Error("Refresh token is required");
-    }
+  // async logout(refreshToken) {
+  //   if (!refreshToken) {
+  //     throw new Error("Refresh token is required");
+  //   }
 
-    let decoded;
-    try {
-      decoded = verifyRefreshToken(refreshToken);
-    } catch (e) {
-      throw new Error("Invalid refresh token");
-    }
-    const session = await sessionRepo.findActiveBySessionId(decoded.sessionId);
-    if (!session) {
-      throw new Error("Session not found or already logged out");
-    }
-    const matched = await compareHash(refreshToken, session.refreshTokenHash);
-    if (!matched) {
-      throw new Error("Invalid refresh token");
-    }
-    // Revoke the session
-    await sessionRepo.revoke(decoded.sessionId);
-    return {
-      message: "Logged out successfully",
-    }
-    // await blacklistToken(refreshToken, 7 * 24 * 60 * 60 * 1000, "refresh");
-
-    // if (accessToken) {
-    //   await blacklistToken(accessToken, 15 * 60 * 1000, "access");
-    // }
-  }
+  //   let decoded;
+  //   try {
+  //     decoded = verifyRefreshToken(refreshToken);
+  //   } catch (e) {
+  //     throw new Error("Invalid refresh token");
+  //   }
+  //   const session = await sessionRepo.findActiveBySessionId(decoded.sessionId);
+  //   if (!session) {
+  //     throw new Error("Session not found or already logged out");
+  //   }
+  //   const matched = await compareHash(refreshToken, session.refreshTokenHash);
+  //   if (!matched) {
+  //     throw new Error("Invalid refresh token");
+  //   }
+  //   // Revoke the session
+  //   await sessionRepo.revoke(decoded.sessionId);
+  //   if (accessToken) {
+  //     try {
+  //       const decodedAccess = verifyAccessToken(accessToken); // decode it
+  //       await blacklistAccessToken(
+  //         decodedAccess.jti, // unique token id
+  //         decodedAccess.exp // expiry timestamp
+  //       );
+  //     } catch (e) {
+  //       // if access token already expired — no need to blacklist, ignore
+  //       console.warn("Access token invalid or expired, skipping blacklist");
+  //     }
+  //   }
+  //   return {
+  //     message: "Logged out successfully",
+  //   };
+  // }
   // New: Logout from all devices
+async logout(refreshToken, jti, exp) {
+  if (!refreshToken) {
+    throw new Error("Refresh token is required");
+  }
+
+  let decoded;
+  try {
+    decoded = verifyRefreshToken(refreshToken);
+  } catch (e) {
+    throw new Error("Invalid refresh token");
+  }
+
+  const session = await sessionRepo.findActiveBySessionId(decoded.sessionId);
+  if (!session) {
+    throw new Error("Session not found or already logged out");
+  }
+  const matched = await compareHash(refreshToken, session.refreshTokenHash);
+  if (!matched) {
+    throw new Error("Invalid refresh token");
+  }
+
+  // ✅ Your existing logic
+  await sessionRepo.revoke(decoded.sessionId);
+
+  // ✅ NEW — blacklist the access token jti
+  await blacklistToken(jti, "ACCESS", exp);
+  return { message: "Logged out successfully" };
+}
   async logoutAll(userId) {
     await Session.updateMany({ userId, revoked: false }, { revoked: true });
     return true;

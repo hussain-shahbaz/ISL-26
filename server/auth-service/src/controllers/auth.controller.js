@@ -74,21 +74,37 @@ export class AuthController {
       next(err);
     }
   }
+  // async logout(req, res, next) {
+  //   try {
+  //     // const accessToken = req.headers.authorization?.split(" ")[1] || null;
+  //     const refreshToken = req.body.refreshToken;
+
+  //     const result = await authService.logout(refreshToken);
+
+  //     res.json({
+  //       success: true,
+  //       message: result.message,
+  //     });
+  //   } catch (err) {
+  //     next(err);
+  //   }
+  // }
   async logout(req, res, next) {
     try {
-      // const accessToken = req.headers.authorization?.split(" ")[1] || null;
       const refreshToken = req.body.refreshToken;
-
-      const result = await authService.logout(refreshToken);
-
+      console.log("req.user →", req.user)
+      // ✅ jti and exp come from req.user (set by authMiddleware)
+      const { jti, exp } = req.user;
+      const result = await authService.logout(refreshToken, jti, exp);
       res.json({
         success: true,
-        message: result.message,
+        message: result.message ,
       });
     } catch (err) {
       next(err);
     }
   }
+
   async logoutAll(req, res, next) {
     try {
       await authService.logoutAll(req.user.userId);
