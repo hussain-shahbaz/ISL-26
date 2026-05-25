@@ -1,13 +1,34 @@
-import User from "../models/user.model.js";
-class AuthRepository {
-  async createUser(userData) {
-    return User.create(userData);
+import AuthIdentity from "../models/authIdentity.model.js";
+
+export class AuthRepository {
+  async create(data) {
+    return AuthIdentity.create(data);
   }
-  async findUserByEmail(email) {
-    return User.findOne({ email });
+
+  async findByEmail(email) {
+    return AuthIdentity.findOne({ email });
   }
-  async findUserById(id) {
-    return User.findById(id).select("-password");
+
+  async findByUserId(userId) {
+    return AuthIdentity.findOne({ userId });
+  }
+  async verifyEmail(userId) {
+    return AuthIdentity.findOneAndUpdate(
+      { userId },
+      {
+        isEmailVerified: true,
+      },
+      {
+        new: true,
+      }
+    );
+  }
+  async updatePassword(userId, passwordHash) {
+    return AuthIdentity.findOneAndUpdate(
+      { userId },
+      {
+        passwordHash,
+      }
+    );
   }
 }
-export default new AuthRepository();

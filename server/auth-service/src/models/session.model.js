@@ -1,29 +1,48 @@
 import mongoose from "mongoose";
 const sessionSchema = new mongoose.Schema(
   {
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "users",
-      required: [true, "User is required"],
+    sessionId: {
+      type: String,
+      required: true,
+      unique: true,
+      index: true
+    },
+    userId: {
+      type: String,
+      required: true,
+      index: true
     },
     refreshTokenHash: {
       type: String,
-      required: [true, "Refresh token hash is required"],
+      required: true
     },
-    ip: {
+    ipAddress: {
       type: String,
-      required: [true, "IP address is required"],
+      required: true
     },
     userAgent: {
       type: String,
-      required: [true, "User agent is required"],
+      required: true
+    },
+    deviceFingerprint: {
+      type: String,
+      required: true
     },
     revoked: {
       type: Boolean,
-      default: false,
+      default: false
     },
+    expiresAt: {
+      type: Date,
+      required: true
+    },
+    lastActivityAt: {
+      type: Date,
+      default: Date.now
+    }
   },
-  { timestamps: true }
+  {
+    timestamps: true
+  }
 );
-const Session = mongoose.model("sessions", sessionSchema);
-export default Session;
+export default mongoose.model("Session", sessionSchema);
