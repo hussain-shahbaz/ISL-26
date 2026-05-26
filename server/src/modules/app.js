@@ -7,7 +7,7 @@ class App {
     this.app = express();
     this.app.use(express.json());
     this.app.use((req, res, next) => {
-      req.user = { userId: '101', role: 'student' };
+      req.user = { userId: '101', role: 'students' };
       next();
     });
     this.app.use('/api/exam', examRoutes.getRouter());

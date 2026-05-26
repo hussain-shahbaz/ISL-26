@@ -1,12 +1,13 @@
 const questionRepository = require('../repository/question_repository');
 const examRepository     = require('../repository/exam_repository');
+const ROLES = require('../config/roles');
 
 class QuestionAuthMiddleware {
 
   async verifyQuestionOwner(req, res, next) {
     try {
       
-      if (req.user.role !== 'teacher') {
+      if (req.user.role !== ROLES.TEACHER) {
         return res.status(403).json({ status: 'error', message: 'Only teachers can access this' });
       }
       const instructorId = req.user.userId;
