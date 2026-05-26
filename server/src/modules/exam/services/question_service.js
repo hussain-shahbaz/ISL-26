@@ -20,7 +20,7 @@ class QuestionService {
     return result;
   }
 
-  async getQuestionsByExam(examId, user) {
+  async getWholeExamByExamId(examId, user) {
     const exam = await examRepository.findById(examId);
     if (!exam) throw new Error('Exam not found');
 
@@ -41,14 +41,29 @@ class QuestionService {
     }
     const questions = await questionRepository.findByExamId(examId);
     // student ko referenceAnswer nahi dikhna
-    if (user.role === 'student') {
-      return questions.map(q => {
-        const { referenceAnswer, ...safe } = q.toObject();
-        return safe;
-      });
+     if (user.role === 'student') {
+      return {
+        exam: {
+          _id:           exam._id,
+          title:         exam.title,
+          subject:       exam.subject,
+          teacherName:   exam.teacherName,
+          scheduledTime: exam.scheduledTime,
+          timeAllowed:   exam.timeAllowed,
+          totalMarks:    exam.totalMarks,
+          status:        exam.status
+        },
+        questions: questions.map(q => {
+          const { referenceAnswer, ...safe } = q.toObject();
+          return safe;
+        })
+      };
     }
 
-    return questions;
+    return {
+      exam:      exam,
+      questions: questions
+    };
   }
 
   async getQuestionById(id) {
