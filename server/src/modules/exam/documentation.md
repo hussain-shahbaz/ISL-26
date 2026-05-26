@@ -184,7 +184,7 @@ Add a question to an existing exam.
 ---
 
 ### `GET /api/exam/question/:examId`
-Get all questions for a specific exam.
+Get all questions and metadata for a specific exam.
 
 **Role required:** `teacher` or `student`
 
