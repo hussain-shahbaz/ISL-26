@@ -1,127 +1,188 @@
-import authService from "../services/auth.service.js";
-import jwt from "../utils/jwt.js";
-const ERROR_MAP = {
-  EMAIL_ALREADY_EXISTS: [409, "An account with this email already exists"],
-  INVALID_CREDENTIALS: [401, "Invalid email or password"],
-  USER_NOT_FOUND: [404, "User not found"],
-  REFRESH_TOKEN_EXPIRED: [401, "Refresh token expired"],
-  INVALID_REFRESH_TOKEN: [401, "Invalid refresh token"],
-};
-class AuthController {
-  async register(req, res) {
+import { AuthService } from "../services/auth.service.js";
+const authService = new AuthService();
+import { verifyRefreshToken } from "../utils/jwt.js";
+export class AuthController {
+  async register(req, res, next) {
     try {
-      const { username, email, password } = req.body;
-      if (!username || !email || !password) {
-        return res
-          .status(400)
-          .json({ message: "username, email, and password are required" });
-      }
-      const { accessToken, refreshToken } = await authService.register({
-        username,
-        email,
-        password,
-    //      ip: req.ip,
-    //   userAgent: req.headers["user-agent"],
-      });
-      res.cookie("refreshToken", refreshToken, {
-        httpOnly: true,
-        secure: true,
-        sameSite: "strict",
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      });
-      return res.status(201).json({
-        message: "Registration successful",
-        accessToken,
+      const user = await authService.register(req.body);
+      res.status(201).json({
+        success: true,
+        data: user,
       });
     } catch (err) {
-      //  catch (err) {
-      //   console.error("Auth.register error:", err);
-      //   const [status, message] = ERROR_MAP[err.message] || [
-      //     500,
-      //     "Internal server error jjj",
-      //   ];
-      //   return res.status(status).json({ message });
-      // }
-      console.error(err);
-
-      return res.status(500).json({
-        error: err.message,
-        stack: err.stack,
-      });
+      next(err);
     }
   }
-  async login(req, res) {
+  async verifyEmail(req, res, next) {
     try {
-      const { email, password } = req.body;
-
-      if (!email || !password) {
-        return res
-          .status(400)
-          .json({ message: "email and password are required" });
-      }
-      const { accessToken, refreshToken } = await authService.login({
-        email,
-        password,
-      });
-      res.cookie("refreshToken", refreshToken, {
-        httpOnly: true,
-        secure: true,
-        sameSite: "strict",
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      });
-      return res.status(200).json({
-        message: "Login successful",
-        accessToken,
+      const result = await authService.verifyEmail(req.body);
+      return res.json({
+        success: true,
+        data: result,
       });
     } catch (err) {
-      const [status, message] = ERROR_MAP[err.message] || [
-        500,
-        "Internal server error",
-      ];
-      return res.status(status).json({ message });
+      next(err);
+    }
+  }
+  async login(req, res, next) {
+    try {
+      const result = await authService.login(req.body, {
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+        deviceFingerprint: req.headers["x-device-fingerprint"] || "unknown",
+      });
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+  async refresh(req, res, next) {
+    try {
+      const token = await authService.refresh(req.body.refreshToken);
+      res.json({
+        success: true,
+        data: { accessToken: token },
+      });
+    } catch (err) {
+      next(err);
     }
   }
 
-  async refreshToken(req, res) {
+  async me(req, res, next) {
     try {
-      const refreshToken = req.cookies?.refreshToken;
-      if (!refreshToken) {
-        return res.status(401).json({ message: "Refresh token not found" });
-      }
-      const decoded = jwt.verifyRefreshToken(refreshToken);
-      const {accessToken,refreshtoken} = await authService.refreshToken(decoded.userId);
-      const newrefreshtoken = refreshtoken
-      res.cookie("newrefreshtoken", newrefreshtoken, {
-        httpOnly: true,
-        secure: true,
-        sameSite: "strict",
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      });
-      return res.status(200).json({
-        message: "Access token refreshed successfully",
-        accessToken,
-        refreshtoken
+      const user = await authService.getMe(req.user.userId);
+      res.json({
+        success: true,
+        data: user,
       });
     } catch (err) {
-      const [status, message] = ERROR_MAP[err.message] || [
-        401,
-        "Invalid refresh token",
-      ];
-      return res.status(status).json({ message });
+      next(err);
     }
   }
-  async getMe(req, res) {
+  async sessions(req, res, next) {
     try {
-      const user = await authService.getMe(req.userId);
-      return res.status(200).json({ user });
+      const sessions = await authService.getSessions(req.user.userId);
+      res.json({
+        success: true,
+        data: sessions,
+      });
     } catch (err) {
-      const [status, message] = ERROR_MAP[err.message] || [
-        500,
-        "Internal server error",
-      ];
-      return res.status(status).json({ message });
+      next(err);
     }
   }
+  // async logout(req, res, next) {
+  //   try {
+  //     // const accessToken = req.headers.authorization?.split(" ")[1] || null;
+  //     const refreshToken = req.body.refreshToken;
+
+  //     const result = await authService.logout(refreshToken);
+
+  //     res.json({
+  //       success: true,
+  //       message: result.message,
+  //     });
+  //   } catch (err) {
+  //     next(err);
+  //   }
+  // }
+  async logout(req, res, next) {
+    try {
+      const refreshToken = req.body.refreshToken;
+      console.log("req.user →", req.user)
+      // ✅ jti and exp come from req.user (set by authMiddleware)
+      const { jti, exp } = req.user;
+      const result = await authService.logout(refreshToken, jti, exp);
+      res.json({
+        success: true,
+        message: result.message ,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async logoutAll(req, res, next) {
+    try {
+      await authService.logoutAll(req.user.userId);
+      res.json({
+        success: true,
+        message: "Logged out from all devices",
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+  async revokeSession(req, res, next) {
+    try {
+      await authService.revokeSession(req.params.id, req.user.userId);
+      res.json({
+        success: true,
+        message: "Session revoked successfully",
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+  async requestNewOTP(req, res, next) {
+    try {
+      const result = await authService.requestNewOTP(req.body);
+      return res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+  async forgotPassword(req, res, next) {
+    try {
+      const result = await authService.forgotPassword(req.body);
+      return res.status(200).json(result);
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+  async verifyResetOTP(req, res, next) {
+    try {
+      const result = await authService.verifyResetOTP(req.body);
+      return res.status(200).json(result);
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+  async resetPassword(req, res, next) {
+    try {
+      const result = await authService.resetPassword(req.body);
+      return res.status(200).json(result);
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+  requestResetPasswordOTP = async (req, res) => {
+    try {
+      const result = await authService.requestResetPasswordOTP(req.body);
+
+      return res.status(200).json(result);
+    } catch (error) {
+      return res.status(400).json({
+        message: error.message,
+      });
+    }
+  };
 }
-
-export default new AuthController();
