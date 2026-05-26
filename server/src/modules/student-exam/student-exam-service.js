@@ -42,7 +42,7 @@ class StudentExamService {
           // "id": '202',
           "instructorId": "101",
           "subject": "Mathematics",
-          "scheduledTime": "2026-05-24T12:17:00.000Z",
+          "scheduledTime": "2026-05-24T5:00dddd:00.000Z",
           "timeAllowed": 60,
           "totalMarks": 10,
           "students": ["roll-001", "roll-002"],
@@ -235,6 +235,36 @@ class StudentExamService {
         // filter : give exams that have his roll number in the array ... and are wither pusblished or sumbitted by student/marked by teacher
         // call exam-module endpoint from service layer
   }
+
+  async getExamDetails(examId, studentId, currentTime) {
+    try {
+      const user = await this.getStudentById(studentId);
+      if (!user || user.data.role !== 'student') {
+        throw new Error('Invalid student ID');
+      }
+      const exam = await this.getExamById(examId);
+      if (!exam) {
+        throw new Error('Invalid exam ID');
+      }
+      const studentExamMap = await this.getStudentExamMap(studentId);
+
+      const validateExamDetailsEligibility = SubmitExamValidator.validateExamDetailsEligibility(user.data, exam.data, studentExamMap, currentTime);
+      if(!validateExamDetailsEligibility.isValid){
+        throw new Error(`Validation failed: ${validateExamDetailsEligibility.errors.join(", ")}`);
+      }
+      return exam.data;
+    }
+    catch (error) {
+      throw new Error(`Failed to fetch exam details: ${error.message}`);
+    }
+    // checks:
+      // id is student
+      // examId is valid
+      // exam is published
+      // exam is assigned to the student
+      // API hit time is before the exam end time (examDate + examTime + duration) and after the exam start time (examDate + examTime)
+  }
+
 }
 
 module.exports = new StudentExamService();

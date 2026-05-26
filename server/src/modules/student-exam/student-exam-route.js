@@ -10,6 +10,7 @@ class StudentExamRoutes {
     _bindRoutes() {
         this.router.post('/submit/:examId', StudentExamController.submitExam);
         this.router.get('/', StudentExamController.getAllExams);
+        this.router.get('/:id', StudentExamController.getExamDetails);
     }
 
     getRouter() {

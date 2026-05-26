@@ -2,9 +2,6 @@ const studentExamService = require('./student-exam-service');
 
 class StudentExamController {
 
-    // bhai ye kese check krna ke answers me jitne asnwers diye wo usi ke questions ke hain
-    // yaani questionId valid hai ya nahi, ye to service layer me check krna pre ga, 
-    // controller me to bas data leke bhejna hai, aur error handle krna hai
     async submitExam(req, res) {
         try {
             // manipulate this according to the request body
@@ -14,7 +11,7 @@ class StudentExamController {
             const id = '301'; // for testing purpose, change it to above line when token is implemented
             const { examId } = req.params;
             const { answers } = req.body;
-            const submissionTime = new Date();
+            const submissionTime = new Date("2026-05-24T12:17:00.000Z");
             const submissionData = {
                 studentId: id,
                 examId:examId,
@@ -108,6 +105,43 @@ class StudentExamController {
             //      }
             // ]  
     }
+
+    async getExamDetails(req, res) {
+        try {
+            // const id = req.user.id; // from token
+            const id = '101'; // for testing purpose, change it to above line when token is implemented
+            // const id = '201'; // for testing purpose, change it to above line when token is implemented
+            // const id = '301'; // for testing purpose, change it to above line when token is implemented
+            const { examId } = req.params;
+            const currentTime = new Date("2025-05-26T05:00:00.000Z"); // time of api hit
+            const examDetails = await studentExamService.getExamDetails(id, examId, currentTime);
+            return res.status(200).json({
+                success: true,
+                message: 'Exam details fetched successfully',
+                statusCode: 200,
+                data: examDetails
+            })
+        }
+        catch (error) {
+            console.log(`controller: failure ${error.message}`)
+            return res.status(500).json({
+                success: false,
+                error: error.message,
+                statusCode: 500,
+                data : {}
+            })
+        }
+        // request attributes needed :
+            //  id(from token)
+            // examId (from params)
+
+        // checks:
+            // id is student
+            // examId is valid
+            // exam is published
+            // exam is assigned to the student
+            // API hit time is before the exam end time (examDate + examTime + duration) and after the exam start time (examDate + examTime)
+    }
 }
 
 module.exports = new StudentExamController();
@@ -117,16 +151,7 @@ module.exports = new StudentExamController();
 
 
 // getExamDetails
-    // request attributes needed :
-        //  id(from token)
-        // examId (from params)
-
-    // checks:
-        // id is student
-        // examId is valid
-        // exam is published
-        // exam is assigned to the student
-        // API hit time is before the exam end time (examDate + examTime + duration) and after the exam start time (examDate + examTime)
+    
 
     // call exam-module endpoint from service layer
 
