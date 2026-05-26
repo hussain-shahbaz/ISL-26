@@ -1,9 +1,6 @@
 const examRepository = require('../repository/exam_repository');
 const questionRepository = require('../repository/question_repository');
-<<<<<<< HEAD
-=======
 const studentExamRepository = require('../repository/student_exam_repository');
->>>>>>> exam-module
 
 class ExamService {
 
@@ -19,19 +16,12 @@ class ExamService {
     return exam;
   }
 
-<<<<<<< HEAD
-  async getExamWithQuestions(id) {
-    const exam = await examRepository.findByIdWithQuestions(id);
-    if (!exam) throw new Error('Exam not found');
-    return exam;
-=======
   async getExamsByStudent(rollNumber) {
     const studentExams = await studentExamRepository.findByRollNumber(rollNumber);
     if (!studentExams) return [];
 
     const exams = await examRepository.findByIds(studentExams.examIds);
     return exams;
->>>>>>> exam-module
   }
 
   async getAllExams() {
@@ -60,10 +50,6 @@ class ExamService {
     const exam = await examRepository.findById(id);
     if (!exam) throw new Error('Exam not found');
 
-<<<<<<< HEAD
-    if (exam.status === 'published') {
-      throw new Error('Published exam cannot be updated');
-=======
     if (['published', 'submitted', 'checked'].includes(exam.status)) {
       throw new Error('Published, submitted or checked exam cannot be updated');
     }
@@ -85,7 +71,6 @@ class ExamService {
       for (const rollNumber of added) {
         await studentExamRepository.addExamToStudent(rollNumber, id);
       }
->>>>>>> exam-module
     }
 
     return await examRepository.updateById(id, data);
@@ -94,9 +79,6 @@ class ExamService {
   async updateStatus(id, newStatus) {
     const exam = await examRepository.findById(id);
     if (!exam) throw new Error('Exam not found');
-<<<<<<< HEAD
-    return await examRepository.updateById(id, { status: newStatus });
-=======
 
     const lockedStatuses = ['submitted', 'checked'];
 
@@ -160,24 +142,18 @@ class ExamService {
 
     return updated;
 
->>>>>>> exam-module
   }
 
   async deleteExam(id) {
     const exam = await examRepository.findById(id);
     if (!exam) throw new Error('Exam not found');
 
-<<<<<<< HEAD
-    if (exam.status === 'published') {
-      throw new Error('Published exam cannot be deleted');
-=======
     if (['published', 'submitted', 'checked'].includes(exam.status)) {
       throw new Error('Published, submitted or checked exam cannot be updated');
     }
 
     for (const rollNumber of exam.students) {
       await studentExamRepository.removeExamFromStudent(rollNumber, id);
->>>>>>> exam-module
     }
 
     await questionRepository.deleteByExamId(id);

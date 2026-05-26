@@ -7,20 +7,6 @@ class QuestionService {
     const exam = await examRepository.findById(examId);
     if (!exam) throw new Error('Exam not found');
 
-<<<<<<< HEAD
-    if (exam.status === 'published') {
-      throw new Error('Cannot add question to a published exam');
-    }
-
-    return await questionRepository.createQuestion({ ...data, examId });
-  }
-
-  async getQuestionsByExam(examId) {
-    const exam = await examRepository.findById(examId);
-    if (!exam) throw new Error('Exam not found');
-
-    return await questionRepository.findByExamId(examId);
-=======
     if (['published', 'submitted', 'checked'].includes(exam.status)) {
       throw new Error('Cannot add question to a published, submitted or checked exam');
     }
@@ -63,7 +49,6 @@ class QuestionService {
     }
 
     return questions;
->>>>>>> exam-module
   }
 
   async getQuestionById(id) {
@@ -77,20 +62,12 @@ class QuestionService {
     if (!question) throw new Error('Question not found');
 
     const exam = await examRepository.findById(question.examId);
-<<<<<<< HEAD
-    if (exam.status === 'published') {
-      throw new Error('Cannot update question of a published exam');
-=======
     if (['published', 'submitted', 'checked'].includes(exam.status)) {
       throw new Error('Cannot update question of a published, submitted or checked exam');
->>>>>>> exam-module
     }
 
     delete data.examId;
 
-<<<<<<< HEAD
-    return await questionRepository.updateById(id, data);
-=======
     const result = await questionRepository.updateById(id, data);
     if (data.marks !== undefined) {
       const difference = data.marks - question.marks;
@@ -100,7 +77,6 @@ class QuestionService {
     }
 
     return result;
->>>>>>> exam-module
   }
 
   async deleteQuestion(id) {
@@ -108,14 +84,6 @@ class QuestionService {
     if (!question) throw new Error('Question not found');
 
     const exam = await examRepository.findById(question.examId);
-<<<<<<< HEAD
-    if (exam.status === 'published') {
-      throw new Error('Cannot delete question of a published exam');
-    }
-
-    return await questionRepository.deleteById(id);
-  }
-=======
     if (['published', 'submitted', 'checked'].includes(exam.status)) {
       throw new Error('Cannot delete question of a published, submitted or checked exam');
     }
@@ -129,7 +97,6 @@ class QuestionService {
     return result;
   }
 
->>>>>>> exam-module
 }
 
 module.exports = new QuestionService();
