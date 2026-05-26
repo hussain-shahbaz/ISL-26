@@ -2,14 +2,21 @@
 
 require('dotenv').config();
 const express = require('express');
+const cookieParser =  require("cookie-parser");
 const loggerMiddleware = require('./src/common/middleware/logger-middleware');
 const LogQueue = require('./src/common/queue/log-queue');
-const AuthRoutes = require('./src/modules/auth/routes');
+const AttachAuth = require('../server/auth-service/src/app').default; // Import and attach auth service app
+
+const auth = require('./auth-service/src/app'); // Import auth service app for internal calls (if needed)
+
+
 
 const app = express();
+AttachAuth(app); // Attach auth service routes and middleware to main app
 const PORT = process.env.MAIN_SERVER_PORT || 3000;
 
 app.use(express.json());
+app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
 
 // Request ID middleware (for tracking)
@@ -32,7 +39,6 @@ app.get('/health', (req, res) => {
 });
 
 // Routes
-app.use('/api/module/auth', AuthRoutes);
 
 // 404 handler
 app.use((req, res) => {

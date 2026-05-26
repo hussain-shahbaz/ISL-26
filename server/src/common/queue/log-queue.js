@@ -1,8 +1,6 @@
 // Queue-based logging system - batches and sends logs to log service
 
 const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
 
 class LogQueue {
   constructor(maxSize = 100, drainIntervalMs = 100, idleTimeoutMs = 50) {
@@ -18,9 +16,7 @@ class LogQueue {
 
   add(logData) {
     this.queue.push(logData);
-    this.drain(); // log every request for testing
-    return;
-
+    
     // Clear existing idle timer
     if (this.idleTimer) {
       clearTimeout(this.idleTimer);
@@ -66,23 +62,11 @@ class LogQueue {
     try {
       for (const log of logsToSend) {
         try {
-          
-
-          log.userId = 'fdslkfjdslk';
           await axios.post(this.logServiceUrl, log, {
             timeout: 5000,
-            headers: {
-              'Content-Type': 'application/json',
-              'Content-Length': JSON.stringify(log).length,
-              'Host': new URL(this.logServiceUrl).host,
-              'Accept': 'application/json',
-              'Accept-Encoding': 'gzip, deflate',
-              'Connection': 'keep-alive'
-            }
           });
         } catch (error) {
-          console.error(`Failed to send log to ${this.logServiceUrl}:`, error.message);
-          console.log('error response data:', error.response ? error.response.data.details : 'No response data');
+          console.error(`Failed to send log to ${this.logServiceUrl}: ${error.message}`);
           // Optionally re-add to queue on failure
           // this.queue.push(log);
         }
