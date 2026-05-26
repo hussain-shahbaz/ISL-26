@@ -65,6 +65,15 @@ export class AuthService {
     if (!user.isEmailVerified) {
       throw new Error("Please verify your email");
     }
+    const activeSessionCount = await sessionRepo.getActiveSessionCount(
+      user.userId
+    );
+
+    if (activeSessionCount > 0) {
+      throw new Error(
+        "You are already logged in on another device. Please logout from there first."
+      );
+    }
     const sessionId = uuid();
     const accessToken = generateAccessToken({
       userId: user.userId,
@@ -87,13 +96,6 @@ export class AuthService {
       deviceFingerprint: meta.deviceFingerprint,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     });
-
-    // const MAX_ACTIVE_SESSIONS = parseInt(process.env.MAX_ACTIVE_SESSIONS) || 5;
-
-    // const activeCount = await sessionRepo.findActiveBySessionId(user.userId);
-    // if (activeCount >= MAX_ACTIVE_SESSIONS) {
-    //   await sessionRepo.deleteOldestSession(user.userId);
-    // }
     return { accessToken, refreshToken, user };
   }
   async verifyEmail(body) {
@@ -215,34 +217,34 @@ export class AuthService {
   //   };
   // }
   // New: Logout from all devices
-async logout(refreshToken, jti, exp) {
-  if (!refreshToken) {
-    throw new Error("Refresh token is required");
-  }
+  async logout(refreshToken, jti, exp) {
+    if (!refreshToken) {
+      throw new Error("Refresh token is required");
+    }
 
-  let decoded;
-  try {
-    decoded = verifyRefreshToken(refreshToken);
-  } catch (e) {
-    throw new Error("Invalid refresh token");
-  }
+    let decoded;
+    try {
+      decoded = verifyRefreshToken(refreshToken);
+    } catch (e) {
+      throw new Error("Invalid refresh token");
+    }
 
-  const session = await sessionRepo.findActiveBySessionId(decoded.sessionId);
-  if (!session) {
-    throw new Error("Session not found or already logged out");
-  }
-  const matched = await compareHash(refreshToken, session.refreshTokenHash);
-  if (!matched) {
-    throw new Error("Invalid refresh token");
-  }
+    const session = await sessionRepo.findActiveBySessionId(decoded.sessionId);
+    if (!session) {
+      throw new Error("Session not found or already logged out");
+    }
+    const matched = await compareHash(refreshToken, session.refreshTokenHash);
+    if (!matched) {
+      throw new Error("Invalid refresh token");
+    }
 
-  // ✅ Your existing logic
-  await sessionRepo.revoke(decoded.sessionId);
+    // ✅ Your existing logic
+    await sessionRepo.revoke(decoded.sessionId);
 
-  // ✅ NEW — blacklist the access token jti
-  await blacklistToken(jti, "ACCESS", exp);
-  return { message: "Logged out successfully" };
-}
+    // ✅ NEW — blacklist the access token jti
+    await blacklistToken(jti, "ACCESS", exp);
+    return { message: "Logged out successfully" };
+  }
   async logoutAll(userId) {
     await Session.updateMany({ userId, revoked: false }, { revoked: true });
     return true;

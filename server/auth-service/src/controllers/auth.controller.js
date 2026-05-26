@@ -31,10 +31,15 @@ export class AuthController {
         userAgent: req.headers["user-agent"],
         deviceFingerprint: req.headers["x-device-fingerprint"] || "unknown",
       });
-
+      res.cookie("refreshToken", result.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
       res.json({
         success: true,
-        data: result,
+        data: result.accessToken,
       });
     } catch (err) {
       next(err);
@@ -42,7 +47,14 @@ export class AuthController {
   }
   async refresh(req, res, next) {
     try {
-      const token = await authService.refresh(req.body.refreshToken);
+      const refreshToken = req.cookies.refreshToken || req.body.refreshToken;
+      if (!refreshToken) {
+        return res
+          .status(401)
+          .json({ success: false, message: "Refresh token missing" });
+      }
+      const token = await authService.refresh(refreshToken);
+
       res.json({
         success: true,
         data: { accessToken: token },
@@ -51,7 +63,6 @@ export class AuthController {
       next(err);
     }
   }
-
   async me(req, res, next) {
     try {
       const user = await authService.getMe(req.user.userId);
@@ -74,37 +85,25 @@ export class AuthController {
       next(err);
     }
   }
-  // async logout(req, res, next) {
-  //   try {
-  //     // const accessToken = req.headers.authorization?.split(" ")[1] || null;
-  //     const refreshToken = req.body.refreshToken;
-
-  //     const result = await authService.logout(refreshToken);
-
-  //     res.json({
-  //       success: true,
-  //       message: result.message,
-  //     });
-  //   } catch (err) {
-  //     next(err);
-  //   }
-  // }
   async logout(req, res, next) {
     try {
-      const refreshToken = req.body.refreshToken;
-      console.log("req.user →", req.user)
-      // ✅ jti and exp come from req.user (set by authMiddleware)
+      const refreshToken = req.cookies.refreshToken || req.body.refreshToken;
+      console.log("req.user →", req.user);
       const { jti, exp } = req.user;
       const result = await authService.logout(refreshToken, jti, exp);
+      res.clearCookie("refreshToken", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+      });
       res.json({
         success: true,
-        message: result.message ,
+        message: result.message,
       });
     } catch (err) {
       next(err);
     }
   }
-
   async logoutAll(req, res, next) {
     try {
       await authService.logoutAll(req.user.userId);

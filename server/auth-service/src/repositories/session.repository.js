@@ -10,6 +10,13 @@ export class SessionRepository {
       expiresAt: { $gt: new Date() },
     });
   }
+  async getActiveSessionCount(userId) {
+  return Session.countDocuments({
+    userId,
+    revoked: false,
+    expiresAt: { $gt: new Date() }
+  });
+}
   async revoke(sessionId) {
     return Session.updateOne({ sessionId }, { revoked: true });
   }
@@ -19,13 +26,4 @@ export class SessionRepository {
       revoked: false,
     });
   }
-//   async cleanupExpiredSessions() {
-//   try {
-//     return await Session.deleteMany({
-//       expiresAt: { $lt: new Date() }
-//     });
-//   } catch (error) {
-//     throw error; // Let the job handle the error
-//   }
-// }
 }
