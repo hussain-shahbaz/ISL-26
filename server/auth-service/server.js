@@ -1,9 +1,8 @@
-import app from "./src/app.js"; 
+import app from "./src/app.js";
 import connectDB from "./src/config/database.js";
-// import { startCleanupJob } from "./src/utils/cleanup.js";
+import config from "./src/config/config.js";
 connectDB();
-const port=3000;
-app.listen(port,()=>{
-    console.log(`Auth service is running on port ${port}`);
-    // startCleanupJob();
+const port = config.PORT || 3000;
+app.listen(port, () => {
+  console.log(`Auth service is running on port ${port}`);
 });

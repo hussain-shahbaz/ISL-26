@@ -1,13 +1,9 @@
 import { Router } from "express";
 import { AuthController } from "../controllers/auth.controller.js";
 import { authMiddleware } from "../middleware/auth.middleware.js";
+import { authLimiter,registerLimiter,loginLimiter } from "../middleware/rateLimiter.js";
 const authRouter = Router();
 const controller = new AuthController();
-import {
-  registerLimiter,
-  loginLimiter,
-  authLimiter,
-} from "../middlewares/rateLimiter.js";
 import express from "express";
 import { validate } from "../middleware/validate.middleware.js";
 import {
