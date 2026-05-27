@@ -149,8 +149,9 @@ Server will start at `http://localhost:3000`
 | `POST` | `/auth/register` | Register new user |
 | `POST` | `/auth/login` | Login user & create session |
 | `POST` | `/auth/refresh` | Refresh access token |
+| `GET` | `/auth/me` | Get current authenticated user |
+| `GET` | `/auth/sessions` | List active sessions for current user |
 | `POST` | `/auth/logout` | Logout current session |
-| `POST` | `/auth/logout-all` | Logout all sessions |
 
 ### Email Verification Endpoints
 
@@ -167,6 +168,90 @@ Server will start at `http://localhost:3000`
 | `POST` | `/auth/request-reset-password-otp` | Request new reset OTP |
 | `POST` | `/auth/verify-reset-otp` | Verify reset OTP |
 | `POST` | `/auth/reset-password` | Reset password |
+
+---
+
+## 🧪 Example Requests
+
+### Register new user
+```bash
+curl -X POST http://localhost:3000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@gmail.com","password":"StrongPass123","role":"student"}'
+```
+
+### Login
+```bash
+curl -X POST http://localhost:3000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@gmail.com","password":"StrongPass123"}'
+```
+
+### Refresh access token
+```bash
+curl -X POST http://localhost:3000/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"refreshToken":"YOUR_REFRESH_TOKEN"}'
+```
+
+### Get current user
+```bash
+curl http://localhost:3000/auth/me \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+### List active sessions
+```bash
+curl http://localhost:3000/auth/sessions \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+### Logout current session
+```bash
+curl -X POST http://localhost:3000/auth/logout \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+### Request new verification OTP
+```bash
+curl -X POST http://localhost:3000/auth/request-otp \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@gmail.com"}'
+```
+
+### Verify email with OTP
+```bash
+curl -X POST http://localhost:3000/auth/verify-email \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@gmail.com","otp":"123456"}'
+```
+### Forgot password
+```bash
+curl -X POST http://localhost:3000/auth/forgot-password \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com"}'
+```
+
+### Request reset password OTP
+```bash
+curl -X POST http://localhost:3000/auth/request-reset-password-otp \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com"}'
+```
+
+### Verify reset OTP
+```bash
+curl -X POST http://localhost:3000/auth/verify-reset-otp \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","otp":"123456"}'
+```
+
+### Reset password
+```bash
+curl -X POST http://localhost:3000/auth/reset-password \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"NewStrongPass123"}'
+```
 
 ---
 
@@ -245,9 +330,9 @@ POST /auth/register
 Content-Type: application/json
 
 {
-  "email": "user@example.com",
+  "email": "orignal@gmail.com",
   "password": "SecurePass123!",
-  "fullName": "John Doe"
+  "role:"student"
 }
 ```
 
@@ -257,8 +342,8 @@ POST /auth/login
 Content-Type: application/json
 
 {
-  "email": "user@example.com",
-  "password": "SecurePass123!"
+  "email": "orignal@gmail.com",
+  "password": "SecurePass123!",
 }
 
 # Response
