@@ -1,0 +1,226 @@
+"""Data provider for exams and submissions"""
+
+import logging
+from typing import List, Dict, Any
+
+logger = logging.getLogger(__name__)
+
+
+class DataProvider:
+    """Provider for exam questions and student submissions"""
+    
+    def __init__(self):
+        """Initialize with mock data (can be replaced with APIs later)"""
+        self.exams = self._load_mock_exams()
+        self.submissions = self._load_mock_submissions()
+    
+    def _load_mock_exams(self) -> Dict[str, List[Dict]]:
+        """Load mock exam questions"""
+        return {
+            "exam_001": [
+                {
+                    "examId": "exam_001",
+                    "questionId": "q1",
+                    "type": "text",
+                    "topic": "photosynthesis",
+                    "questionText": "What is photosynthesis and how do plants use it?",
+                    "marks": 5,
+                    "referenceAnswer": "Photosynthesis is the process by which plants convert light energy (from the sun) into chemical energy stored in glucose. Plants use sunlight, water, and carbon dioxide to produce glucose and oxygen. This glucose is used as an energy source for growth and metabolism."
+                },
+                {
+                    "examId": "exam_001",
+                    "questionId": "q2",
+                    "type": "text",
+                    "topic": "water cycle",
+                    "questionText": "Explain the water cycle in three sentences.",
+                    "marks": 3,
+                    "referenceAnswer": "Water evaporates from oceans and lakes due to heat from the sun. The water vapor rises into the atmosphere and condenses to form clouds. Finally, the water falls back to earth as precipitation, completing the cycle."
+                },
+                {
+                    "examId": "exam_001",
+                    "questionId": "q3",
+                    "type": "mcq",
+                    "topic": "chemistry - salt formula",
+                    "questionText": "What is the chemical formula for salt?",
+                    "options": ["H2O", "NaCl", "CO2", "O2"],
+                    "marks": 2,
+                    "referenceAnswer": "NaCl"
+                },
+                {
+                    "examId": "exam_001",
+                    "questionId": "q4",
+                    "type": "text",
+                    "topic": "states of matter",
+                    "questionText": "What are the three states of matter?",
+                    "marks": 3,
+                    "referenceAnswer": "The three states of matter are solid, liquid, and gas. Solids have fixed shape and volume. Liquids have fixed volume but take the shape of their container. Gases have neither fixed shape nor volume."
+                },
+                {
+                    "examId": "exam_001",
+                    "questionId": "q5",
+                    "type": "text",
+                    "topic": "DNA and genetics",
+                    "questionText": "Define DNA and explain its role in living organisms.",
+                    "marks": 5,
+                    "referenceAnswer": "DNA (deoxyribonucleic acid) is a molecule that carries genetic instructions for life. It contains genes that determine traits and characteristics of organisms. DNA is responsible for heredity and passing genetic information from parents to offspring."
+                }
+            ]
+        }
+    
+    def _load_mock_submissions(self) -> Dict[str, List[Dict]]:
+        """Load mock student submissions"""
+        return {
+            "exam_001": [
+                {
+                    "examId": "exam_001",
+                    "studentId": "student_001",
+                    "answers": [
+                        {
+                            "questionId": "q1",
+                            "submittedAnswer": "Photosynthesis is when plants make food using sunlight. They take in sunlight, water and CO2 and make glucose and oxygen which they use for energy.",
+                            "questionType": "text",
+                            "marksAllocated": 5
+                        },
+                        {
+                            "questionId": "q2",
+                            "submittedAnswer": "Water evaporates from the ocean, forms clouds in the sky, and then falls as rain.",
+                            "questionType": "text",
+                            "marksAllocated": 3
+                        },
+                        {
+                            "questionId": "q3",
+                            "submittedAnswer": "NaCl",
+                            "questionType": "mcq",
+                            "marksAllocated": 2
+                        },
+                        {
+                            "questionId": "q4",
+                            "submittedAnswer": "Solid, liquid and gas are the three forms. Solids are hard and have a shape. Liquids can flow and take the shape of their container. Gases fill any container they are in.",
+                            "questionType": "text",
+                            "marksAllocated": 3
+                        },
+                        {
+                            "questionId": "q5",
+                            "submittedAnswer": "DNA is the genetic material in cells. It stores information about how organisms develop and function. It is passed from parents to children.",
+                            "questionType": "text",
+                            "marksAllocated": 5
+                        }
+                    ]
+                },
+                {
+                    "examId": "exam_001",
+                    "studentId": "student_002",
+                    "answers": [
+                        {
+                            "questionId": "q1",
+                            "submittedAnswer": "It's the process plants do with leaves and sun",
+                            "questionType": "text",
+                            "marksAllocated": 5
+                        },
+                        {
+                            "questionId": "q2",
+                            "submittedAnswer": "Water goes up as vapor and comes back down as rain",
+                            "questionType": "text",
+                            "marksAllocated": 3
+                        },
+                        {
+                            "questionId": "q3",
+                            "submittedAnswer": "H2O",
+                            "questionType": "mcq",
+                            "marksAllocated": 2
+                        },
+                        {
+                            "questionId": "q4",
+                            "submittedAnswer": "Solid, liquid, gas",
+                            "questionType": "text",
+                            "marksAllocated": 3
+                        },
+                        {
+                            "questionId": "q5",
+                            "submittedAnswer": "DNA is genetic code in cells",
+                            "questionType": "text",
+                            "marksAllocated": 5
+                        }
+                    ]
+                },
+                {
+                    "examId": "exam_001",
+                    "studentId": "student_003",
+                    "answers": [
+                        {
+                            "questionId": "q1",
+                            "submittedAnswer": "Photosynthesis is a biochemical process where chlorophyll in chloroplasts captures photons and initiates the light-dependent reactions. These reactions generate ATP and NADPH which power the Calvin cycle, fixing CO2 into glucose molecules. The electron transport chain in the thylakoid membrane produces the proton gradient necessary for ATP synthesis.",
+                            "questionType": "text",
+                            "marksAllocated": 5
+                        },
+                        {
+                            "questionId": "q2",
+                            "submittedAnswer": "The hydrological cycle begins with evapotranspiration from surface water bodies and vegetation. Water vapor condenses in the troposphere forming precipitation. Precipitation returns to the surface through infiltration and surface runoff.",
+                            "questionType": "text",
+                            "marksAllocated": 3
+                        },
+                        {
+                            "questionId": "q3",
+                            "submittedAnswer": "NaCl",
+                            "questionType": "mcq",
+                            "marksAllocated": 2
+                        },
+                        {
+                            "questionId": "q4",
+                            "submittedAnswer": "Matter exists in three physical states: solid state characterized by defined crystalline structure and rigidity; liquid state with molecular freedom and surface tension properties; and gaseous state with kinetic energy exceeding intermolecular forces.",
+                            "questionType": "text",
+                            "marksAllocated": 3
+                        },
+                        {
+                            "questionId": "q5",
+                            "submittedAnswer": "Deoxyribonucleic acid is a polynucleotide polymer composed of nucleotides. It serves as the primary genetic material in most organisms, encoding information through the sequence of purine and pyrimidine bases. Differential gene expression and inheritance are mediated through DNA replication and transcription mechanisms.",
+                            "questionType": "text",
+                            "marksAllocated": 5
+                        }
+                    ]
+                }
+            ]
+        }
+    
+    def get_exam_questions(self, exam_id: str) -> List[Dict[str, Any]]:
+        """
+        Get all questions for an exam
+        
+        Args:
+            exam_id: The exam ID
+            
+        Returns:
+            List of question dictionaries
+        """
+        logger.info(f"Fetching questions for exam {exam_id}")
+        return self.exams.get(exam_id, [])
+    
+    def get_exam_submissions(self, exam_id: str) -> List[Dict[str, Any]]:
+        """
+        Get all submissions for an exam
+        
+        Args:
+            exam_id: The exam ID
+            
+        Returns:
+            List of submission dictionaries
+        """
+        logger.info(f"Fetching submissions for exam {exam_id}")
+        return self.submissions.get(exam_id, [])
+    
+    def get_student_submission(self, exam_id: str, student_id: str) -> Dict[str, Any]:
+        """
+        Get a specific student's submission
+        
+        Args:
+            exam_id: The exam ID
+            student_id: The student ID
+            
+        Returns:
+            Submission dictionary or None
+        """
+        submissions = self.get_exam_submissions(exam_id)
+        return next(
+            (s for s in submissions if s['studentId'] == student_id),
+            None
+        )
