@@ -1,9 +1,9 @@
-const express = require('express');
-
+import userRouter from "./routes/user.routes.js";
+import express from "express";
 const app = express();
-
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-module.exports = app;
+app.use("/api/users", userRouter);
+// Error handling middleware
+export default app;
