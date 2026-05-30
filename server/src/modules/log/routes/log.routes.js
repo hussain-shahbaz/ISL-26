@@ -3,6 +3,8 @@
 const express = require('express');
 const router = express.Router();
 const LogController = require('../controller/log.controller');
+const serviceAuth = require('../middleware/service_auth_middleware')
+
 const {
   validateCreateLog,
   validateLogId,
@@ -14,6 +16,7 @@ const {
   handleValidationErrors,
 } = require('../validator/log.validator');
 
+router.use(serviceAuth.verify.bind(serviceAuth));
 router.post('/', validateCreateLog, handleValidationErrors, LogController.createLog);
 router.get('/health', LogController.healthCheck);
 router.get('/logs/:id', validateLogId, handleValidationErrors, LogController.getLog);
