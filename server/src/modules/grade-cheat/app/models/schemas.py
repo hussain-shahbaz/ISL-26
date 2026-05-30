@@ -44,6 +44,9 @@ class GradingResult(BaseModel):
     whyWrong: Optional[str] = None
     reasoning: str
     confidence: float
+    cheatingScore: Optional[float] = None
+    cheatingFlag: Optional[bool] = None
+    cheatingDetails: Optional[Dict[str, Any]] = None
 
 
 class ExamResult(BaseModel):

@@ -9,8 +9,14 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from app.config import Config
+from app.services.rate_limiter import get_rate_limiter
 
 logger = logging.getLogger(__name__)
+
+
+class QuotaExhaustedError(Exception):
+    """Raised when the Gemini API quota/credits are exhausted (429 RESOURCE_EXHAUSTED)"""
+    pass
 
 
 class GradingOutput(BaseModel):
@@ -32,8 +38,6 @@ class GeminiGradingService:
 
     def __init__(self):
         """Initialize Gemini client"""
-
-        print("GEMINI API KEY ============== ",Config.GEMINI_API_KEY)
         if not Config.GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY not configured")
 
@@ -154,6 +158,10 @@ Evaluate the answer carefully and return structured grading output.
 
             chain = prompt | structured_llm
 
+            # Apply rate limiting to respect free tier quota (5 req/min)
+            rate_limiter = get_rate_limiter()
+            rate_limiter.wait_if_needed()
+            
             result: GradingOutput = chain.invoke(
                 {
                     "question_text": question_text,
@@ -179,6 +187,19 @@ Evaluate the answer carefully and return structured grading output.
             }
 
         except Exception as e:
+            error_str = str(e).lower()
+            
+            # Detect quota/rate limit exhaustion and raise specific error
+            if any(keyword in error_str for keyword in [
+                'resource_exhausted', '429', 'quota exceeded', 'rate limit'
+            ]):
+                logger.error("Gemini API quota exhausted - stopping grading")
+                raise QuotaExhaustedError(
+                    "Gemini API credits/quota exhausted. "
+                    "You have exceeded the free tier limit. "
+                    "Please wait or upgrade your plan."
+                ) from e
+            
             logger.exception("Error grading answer")
 
             return {

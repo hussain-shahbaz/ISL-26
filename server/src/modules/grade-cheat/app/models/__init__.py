@@ -11,7 +11,8 @@ from app.models.schemas import (
 from app.models.database import (
     MongoDBClient,
     ExamResultRepository,
-    ExamAnalysisRepository
+    ExamAnalysisRepository,
+    GradingTaskRepository
 )
 
 __all__ = [
@@ -24,5 +25,7 @@ __all__ = [
     # Database
     'MongoDBClient',
     'ExamResultRepository',
-    'ExamAnalysisRepository'
+    'ExamAnalysisRepository',
+    'GradingTaskRepository'
 ]
+

@@ -94,3 +94,62 @@ class ExamAnalysisRepository:
             logger.error(f"Error finding analysis: {e}")
             return None
 
+
+class GradingTaskRepository:
+    """Grading tasks collection for persisting async task state"""
+    
+    def __init__(self):
+        self.mongo = MongoDBClient()
+        self.collection = self.mongo.db['grading-tasks']
+    
+    def insert_task(self, task_data: Dict[str, Any]) -> str:
+        """Insert a new grading task"""
+        try:
+            result = self.collection.insert_one(task_data)
+            logger.info(f"Inserted grading task: {task_data.get('task_id')}")
+            return str(result.inserted_id)
+        except Exception as e:
+            logger.error(f"Error inserting grading task: {e}")
+            raise
+    
+    def update_task(self, task_id: str, update_data: Dict[str, Any]) -> bool:
+        """Update a grading task by task_id"""
+        try:
+            result = self.collection.update_one(
+                {'task_id': task_id},
+                {'$set': update_data}
+            )
+            return result.modified_count > 0
+        except Exception as e:
+            logger.error(f"Error updating grading task: {e}")
+            return False
+    
+    def find_by_task_id(self, task_id: str) -> Optional[Dict]:
+        """Get a grading task by its task_id"""
+        try:
+            return self.collection.find_one({'task_id': task_id})
+        except Exception as e:
+            logger.error(f"Error finding grading task: {e}")
+            return None
+    
+    def find_by_exam(self, exam_id: str) -> List[Dict]:
+        """Get all grading tasks for an exam, newest first"""
+        try:
+            return list(
+                self.collection.find(
+                    {'exam_id': exam_id}
+                ).sort('created_at', -1)
+            )
+        except Exception as e:
+            logger.error(f"Error finding grading tasks by exam: {e}")
+            return []
+    
+    def delete_task(self, task_id: str) -> bool:
+        """Delete a grading task"""
+        try:
+            result = self.collection.delete_one({'task_id': task_id})
+            return result.deleted_count > 0
+        except Exception as e:
+            logger.error(f"Error deleting grading task: {e}")
+            return False
+
