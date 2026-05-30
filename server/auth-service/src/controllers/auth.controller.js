@@ -175,7 +175,7 @@ export class AuthController {
   }
   requestResetPasswordOTP = async (req, res) => {
     try {
-      const result = await authService.requestResetPasswordOTP(req.body);
+      const result = await authService.forgotPassword(req.body);
 
       return res.status(200).json(result);
     } catch (error) {

@@ -18,42 +18,48 @@ const emailService = new EmailService();
 const verificationRepo = new VerificationRepository();
 export class AuthService {
   async register(body) {
+    // 1. check MongoDB — permanent record
     const existing = await authRepo.findByEmail(body.email);
     if (existing) {
       throw new Error("Email already exists");
     }
+    // 2. check Redis — registration in progress
+    const inProgress = await verificationRepo.isRegistrationInProgress(
+      body.email
+    );
+    if (inProgress) {
+      throw new Error(
+        "Registration already in progress. Please verify your email."
+      );
+    }
+    // 3. generate userId + hash password
     const userId = uuid();
-    // future:
-    // call user service here
     const passwordHash = await hashValue(body.password);
-    // CREATE USER
-    await authRepo.create({
+    // 4. store temp registration data in Redis
+    await verificationRepo.storeTempRegistration(userId, {
       userId,
+      // name: body.name,
       email: body.email,
-      passwordHash,
       role: body.role,
-      isEmailVerified: false,
+      passwordHash,
     });
-    // GENERATE OTP
+    // 5. generate OTP + hash it
     const otp = generateOTP();
-    // HASH OTP
     const otpHash = await hashValue(otp);
-    // STORE OTP
-    await verificationRepo.create({
-      userId,
-      type: "EMAIL_VERIFICATION",
+
+    // 6. store OTP in Redis
+    await verificationRepo.storeOTP("EMAIL_VERIFICATION", body.email, {
+      userId, // ← link to temp data
       otpHash,
-      resendCount: 0,
-      blockedUntil: null,
-      expiresAt: new Date(Date.now() + 2 * 60 * 1000),
     });
-    // SEND EMAIL
+
+    // 7. send OTP email
     await emailService.sendVerificationEmail(body.email, otp);
-    // FINAL RESPONSE
+
     return {
       message:
         "Registration successful. Please check your email for verification OTP.",
-      expiresAt: new Date(Date.now() + 2 * 60 * 1000),
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
     };
   }
   async login(body, meta) {
@@ -99,64 +105,63 @@ export class AuthService {
     return { accessToken, refreshToken, user };
   }
   async verifyEmail(body) {
-    // FIND USER
-    const user = await authRepo.findByEmail(body.email);
-
-    if (!user) {
-      throw new Error("User not found");
-    }
-    // CHECK VERIFIED
-    if (user.isEmailVerified) {
-      throw new Error("Email already verified");
-    }
-
-    // FIND TOKEN
-    const token = await verificationRepo.findToken(
-      user.userId,
-      "EMAIL_VERIFICATION"
+    // 1. get OTP data from Redis
+    const otpData = await verificationRepo.getOTP(
+      "EMAIL_VERIFICATION",
+      body.email
     );
-
-    // TOKEN NOT FOUND
-    if (!token) {
-      throw new Error("No OTP session found. Please request a new OTP.");
+    if (!otpData) {
+      throw new Error("OTP expired or invalid. Please register again.");
     }
-
-    // OTP ALREADY USED
-    if (token.used) {
+    // 2. check if blocked
+    if (otpData.blockedUntil && new Date(otpData.blockedUntil) > new Date()) {
+      throw new Error("Too many failed attempts. Please try again later.");
+    }
+    // 3. check already used
+    if (otpData.used) {
       throw new Error("OTP already used. Please request a new OTP.");
     }
-
-    // OTP EXPIRED
-    // if (token.expiresAt < new Date()) {
-    //   throw new Error("OTP expired. Please request a new OTP.");
-    // }
-
-    // TOO MANY WRONG ATTEMPTS
-    if (token.attempts >= 5) {
+    // 4. check expired
+    if (new Date(otpData.expiresAt) < new Date()) {
+      throw new Error("OTP expired. Please register again.");
+    }
+    // 5. check too many attempts
+    if (otpData.attempts >= 5) {
+      await verificationRepo.updateOTP("EMAIL_VERIFICATION", body.email, {
+        blockedUntil: new Date(Date.now() + 10 * 60 * 1000),
+      });
       throw new Error("Too many failed attempts. Please request a new OTP.");
     }
-
-    // COMPARE OTP
-    const matched = await compareHash(body.otp, token.otpHash);
-
-    // INVALID OTP
+    // 6. compare OTP
+    const matched = await compareHash(body.otp, otpData.otpHash);
     if (!matched) {
-      await verificationRepo.incrementAttempts(token._id);
-
+      await verificationRepo.updateOTP("EMAIL_VERIFICATION", body.email, {
+        attempts: otpData.attempts + 1,
+      });
       throw new Error("Invalid OTP");
     }
-    if (matched && token.expiresAt < new Date()) {
-      throw new Error("OTP expired. Please request a new OTP.");
+    // 7. get temp registration data
+    const tempData = await verificationRepo.getTempRegistration(otpData.userId);
+    if (!tempData) {
+      throw new Error("Registration session expired. Please register again.");
     }
-
-    // MARK USED
-    await verificationRepo.markUsed(token._id);
-
-    // VERIFY USER
-    await authRepo.verifyEmail(user.userId);
-
+    // 8. create auth record in MongoDB
+    await authRepo.create({
+      userId: tempData.userId,
+      email: tempData.email,
+      passwordHash: tempData.passwordHash,
+      role: tempData.role,
+      isEmailVerified: true,
+    });
+    // 10. mark OTP used
+    await verificationRepo.updateOTP("EMAIL_VERIFICATION", body.email, {
+      used: true,
+    });
+    // 11. cleanup Redis
+    await verificationRepo.deleteOTP("EMAIL_VERIFICATION", body.email);
+    await verificationRepo.deleteTempRegistration(tempData.userId);
     return {
-      message: "Email verified successfully. You can now login.",
+      message: "Email verified successfully.",
     };
   }
   async refresh(refreshToken) {
@@ -179,7 +184,7 @@ export class AuthService {
   async getSessions(userId) {
     return sessionRepo.getUserSessions(userId);
   }
-  // async logout(refreshToken) {
+  
   //   if (!refreshToken) {
   //     throw new Error("Refresh token is required");
   //   }
@@ -260,67 +265,61 @@ export class AuthService {
     return true;
   }
   async requestNewOTP(body) {
-    // 1. FIND USER
+    // 1. check permanent record — must NOT exist yet
     const user = await authRepo.findByEmail(body.email);
-    if (!user) {
-      throw new Error("User not found");
+    if (user) {
+      throw new Error("Email already verified. Please login.");
     }
-    // 2. CHECK VERIFIED
-    if (user.isEmailVerified) {
-      throw new Error("Email already verified");
-    }
-    // 3. FIND EXISTING TOKEN
-    const token = await verificationRepo.findToken(
-      user.userId,
-      "EMAIL_VERIFICATION"
+    // 2. get OTP from Redis
+    const otpData = await verificationRepo.getOTP(
+      "EMAIL_VERIFICATION",
+      body.email
     );
-    if (!token) {
-      throw new Error("No OTP session found");
+    if (!otpData) {
+      throw new Error("No OTP session found. Please register again.");
     }
-    // if (token.expiresAt < new Date()) {
-    //   throw new Error("OTP expired");
-    // }
-    // 4. CHECK TEMP BLOCK
-    if (token.blockedUntil && token.blockedUntil > new Date()) {
+    // 3. check blocked
+    if (otpData.blockedUntil && new Date(otpData.blockedUntil) > new Date()) {
       throw new Error("Too many OTP requests. Try again later.");
     }
-    // 5. CHECK COOLDOWN
-    const timeDifference = Date.now() - new Date(token.updatedAt).getTime();
-    if (timeDifference < 30 * 1000) {
+    // 4. cooldown check (30 seconds)
+    const timeDiff = Date.now() - new Date(otpData.updatedAt).getTime();
+    if (timeDiff < 30 * 1000) {
       throw new Error("Please wait 30 seconds before requesting another OTP.");
     }
-    // 6. CHECK RESEND LIMIT
-    if (token.resendCount >= 3) {
-      token.blockedUntil = new Date(Date.now() + 15 * 60 * 1000);
-      await token.save();
+    // 5. resend limit
+    if (otpData.resendCount >= 3) {
+      await verificationRepo.updateOTP("EMAIL_VERIFICATION", body.email, {
+        blockedUntil: new Date(Date.now() + 15 * 60 * 1000),
+      });
       throw new Error("Too many OTP requests. Try again after 15 minutes.");
     }
-    // 7. GENERATE NEW OTP
+
+    // 6. generate new OTP
     const otp = generateOTP();
-    // 8. HASH OTP
     const otpHash = await hashValue(otp);
-    // 9. NEW EXPIRY
-    const expiresAt = new Date(Date.now() + 2 * 60 * 1000);
-    // 10. UPDATE EXISTING TOKEN
-    token.otpHash = otpHash;
-    token.expiresAt = expiresAt;
-    token.used = false;
-    token.attempts = 0;
-    token.resendCount += 1;
-    await token.save();
-    // 11. SEND EMAIL
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    // 7. update OTP in Redis
+    await verificationRepo.updateOTP("EMAIL_VERIFICATION", body.email, {
+      otpHash,
+      expiresAt,
+      used: false,
+      attempts: 0,
+      resendCount: otpData.resendCount + 1,
+    });
+
+    // 8. send email
     await emailService.sendVerificationEmail(body.email, otp);
-    // 12. RETURN RESPONSE
+
     return {
-      message: "OTP sent successfully",
+      message: "OTP sent successfully.",
       expiresAt,
     };
   }
   async forgotPassword(body) {
-    // 1. FIND USER
+    // 1. find user — security: don't reveal if email exists
     const user = await authRepo.findByEmail(body.email);
-    // SECURITY:
-    // Do not reveal whether email exists
     if (!user) {
       return {
         message:
@@ -330,270 +329,143 @@ export class AuthService {
     if (!user.isEmailVerified) {
       throw new Error("Please verify your email first.");
     }
-    // 2. FIND EXISTING RESET TOKEN
-    let token = await verificationRepo.findToken(user.userId, "PASSWORD_RESET");
+    // 2. get existing OTP from Redis
+    const otpData = await verificationRepo.getOTP("PASSWORD_RESET", body.email);
 
-    // 3. CHECK TEMP BLOCK
-    if (token?.blockedUntil && token.blockedUntil > new Date()) {
+    // 3. check blocked
+    if (otpData?.blockedUntil && new Date(otpData.blockedUntil) > new Date()) {
       throw new Error("Too many OTP requests. Try again later.");
     }
-    // 4. RESET BLOCK IF EXPIRED
-    if (token?.blockedUntil && token.blockedUntil < new Date()) {
-      token.blockedUntil = null;
-      token.resendCount = 0;
-      await token.save();
+
+    // 4. reset block if expired
+    if (otpData?.blockedUntil && new Date(otpData.blockedUntil) < new Date()) {
+      await verificationRepo.updateOTP("PASSWORD_RESET", body.email, {
+        blockedUntil: null,
+        resendCount: 0,
+      });
     }
-    // 5. COOLDOWN CHECK
-    if (token) {
-      const diff = Date.now() - new Date(token.updatedAt).getTime();
+    // 5. cooldown check
+    if (otpData) {
+      const diff = Date.now() - new Date(otpData.updatedAt).getTime();
       if (diff < 30 * 1000) {
         throw new Error(
           "Please wait 30 seconds before requesting another OTP."
         );
       }
     }
-    // 6. RESEND LIMIT
-    if (token && token.resendCount >= 3) {
-      token.blockedUntil = new Date(Date.now() + 15 * 60 * 1000);
-      await token.save();
+    // 6. resend limit
+    if (otpData && otpData.resendCount >= 3) {
+      await verificationRepo.updateOTP("PASSWORD_RESET", body.email, {
+        blockedUntil: new Date(Date.now() + 15 * 60 * 1000),
+      });
       throw new Error("Too many OTP requests. Try again after 15 minutes.");
     }
-    // 7. GENERATE OTP
+
+    // 7. generate OTP
     const otp = generateOTP();
-    // 8. HASH OTP
     const otpHash = await hashValue(otp);
-    // 9. NEW EXPIRY
-    const expiresAt = new Date(Date.now() + 2 * 60 * 1000);
-    // 10. CREATE TOKEN IF NOT EXISTS
-    if (!token) {
-      token = await verificationRepo.create({
-        userId: user.userId,
-        type: "PASSWORD_RESET",
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    // 8. store or update OTP in Redis
+    if (!otpData) {
+      await verificationRepo.storeOTP("PASSWORD_RESET", body.email, {
         otpHash,
         expiresAt,
-        attempts: 0,
-        resendCount: 0,
-        used: false,
-        resetVerified: false,
       });
     } else {
-      // 11. UPDATE EXISTING TOKEN
-      token.otpHash = otpHash;
-      token.expiresAt = expiresAt;
-      token.attempts = 0;
-      token.used = false;
-      token.resetVerified = false;
-      token.resendCount += 1;
-      await token.save();
+      await verificationRepo.updateOTP("PASSWORD_RESET", body.email, {
+        otpHash,
+        expiresAt,
+        used: false,
+        attempts: 0,
+        resetVerified: false,
+        resendCount: otpData.resendCount + 1,
+      });
     }
-    // 12. SEND EMAIL
+
+    // 9. send email
     await emailService.sendPasswordResetEmail(body.email, otp);
-    // 13. RESPONSE
+
     return {
       message:
         "If an account exists with this email, a reset OTP has been sent.",
       expiresAt,
     };
   }
+
   async verifyResetOTP(body) {
-    // 1. FIND USER
-    const user = await authRepo.findByEmail(body.email);
-
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    // 2. FIND RESET TOKEN
-    const token = await verificationRepo.findToken(
-      user.userId,
-      "PASSWORD_RESET"
-    );
-
-    // 3. TOKEN NOT FOUND
-    if (!token) {
+    // 1. get OTP from Redis
+    const otpData = await verificationRepo.getOTP("PASSWORD_RESET", body.email);
+    if (!otpData) {
       throw new Error("No reset OTP session found.");
     }
-
-    // 4. OTP ALREADY USED
-    if (token.used) {
+    // 2. check already used
+    if (otpData.used) {
       throw new Error("OTP already used.");
     }
 
-    // 5. OTP EXPIRED
-    if (token.expiresAt < new Date()) {
+    // 3. check expired
+    if (new Date(otpData.expiresAt) < new Date()) {
       throw new Error("OTP expired. Please request a new OTP.");
     }
-
-    // 6. TOO MANY FAILED ATTEMPTS
-    if (token.attempts >= 5) {
+    // 4. check too many attempts
+    if (otpData.attempts >= 5) {
       throw new Error("Too many failed attempts. Please request a new OTP.");
     }
 
-    // 7. COMPARE OTP
-    const matched = await compareHash(body.otp, token.otpHash);
-
-    // 8. INVALID OTP
+    // 5. compare OTP
+    const matched = await compareHash(body.otp, otpData.otpHash);
     if (!matched) {
-      await verificationRepo.incrementAttempts(token._id);
-
+      await verificationRepo.updateOTP("PASSWORD_RESET", body.email, {
+        attempts: otpData.attempts + 1,
+      });
       throw new Error("Invalid OTP");
     }
-
-    // 9. MARK RESET VERIFIED
-    token.resetVerified = true;
-
-    // token.used = true;
-
-    await token.save();
-
-    // 10. SUCCESS RESPONSE
+    // 6. mark reset verified
+    await verificationRepo.updateOTP("PASSWORD_RESET", body.email, {
+      resetVerified: true,
+    });
     return {
       message: "OTP verified successfully. You can now reset your password.",
     };
   }
-  async requestResetPasswordOTP(body) {
-    // 1. FIND USER
-    const user = await authRepo.findByEmail(body.email);
-
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    // 2. EMAIL MUST BE VERIFIED
-    if (!user.isEmailVerified) {
-      throw new Error("Please verify your email first.");
-    }
-
-    // 3. FIND EXISTING TOKEN
-    let token = await verificationRepo.findToken(user.userId, "PASSWORD_RESET");
-
-    // 4. CHECK BLOCK
-    if (token?.blockedUntil && token.blockedUntil > new Date()) {
-      throw new Error("Too many OTP requests. Try again after 15 minutes.");
-    }
-
-    // 5. RESET BLOCK IF EXPIRED
-    if (token?.blockedUntil && token.blockedUntil < new Date()) {
-      token.blockedUntil = null;
-
-      token.resendCount = 0;
-
-      await token.save();
-    }
-
-    // 6. COOLDOWN CHECK
-    if (token) {
-      const diff = Date.now() - new Date(token.updatedAt).getTime();
-
-      if (diff < 30 * 1000) {
-        throw new Error(
-          "Please wait 30 seconds before requesting another OTP."
-        );
-      }
-    }
-
-    // 7. RESEND LIMIT
-    if (token && token.resendCount >= 3) {
-      token.blockedUntil = new Date(Date.now() + 15 * 60 * 1000);
-
-      await token.save();
-
-      throw new Error("Too many OTP requests. Try again after 15 minutes.");
-    }
-
-    // 8. GENERATE OTP
-    const otp = generateOTP();
-
-    // 9. HASH OTP
-    const otpHash = await hashValue(otp);
-
-    // 10. EXPIRY
-    const expiresAt = new Date(Date.now() + 2 * 60 * 1000);
-
-    // 11. CREATE TOKEN
-    if (!token) {
-      token = await verificationRepo.create({
-        userId: user.userId,
-
-        type: "PASSWORD_RESET",
-
-        otpHash,
-
-        expiresAt,
-
-        attempts: 0,
-
-        resendCount: 1,
-
-        used: false,
-
-        resetVerified: false,
-      });
-    } else {
-      // UPDATE EXISTING TOKEN
-      token.otpHash = otpHash;
-
-      token.expiresAt = expiresAt;
-
-      token.attempts = 0;
-
-      token.used = false;
-
-      token.resetVerified = false;
-
-      token.resendCount += 1;
-
-      await token.save();
-    }
-
-    // 12. SEND EMAIL
-    await emailService.sendPasswordResetEmail(body.email, otp);
-
-    // 13. RESPONSE
-    return {
-      message: "Reset OTP sent successfully.",
-
-      expiresAt,
-    };
-  }
   async resetPassword(body) {
-    // 1. FIND USER
+    // 1. find user
     const user = await authRepo.findByEmail(body.email);
     if (!user) {
       throw new Error("User not found");
     }
-    // 2. FIND PASSWORD RESET TOKEN
-    const token = await verificationRepo.findToken(
-      user.userId,
-      "PASSWORD_RESET"
-    );
-    // 3. TOKEN NOT FOUND
-    if (!token) {
+
+    // 2. get OTP from Redis
+    const otpData = await verificationRepo.getOTP("PASSWORD_RESET", body.email);
+    if (!otpData) {
       throw new Error("Reset session not found.");
     }
-    // 4. CHECK OTP VERIFIED
-    if (!token.resetVerified) {
+
+    // 3. check reset verified
+    if (!otpData.resetVerified) {
       throw new Error("OTP verification required.");
     }
-    // 5. CHECK TOKEN USED
-    if (token.used) {
+
+    // 4. check already used
+    if (otpData.used) {
       throw new Error("Reset session already used.");
     }
-    // 6. CHECK EXPIRY
-    if (token.expiresAt < new Date()) {
+
+    // 5. check expired
+    if (new Date(otpData.expiresAt) < new Date()) {
       throw new Error("Reset session expired. Please request a new OTP.");
     }
-    // 7. HASH NEW PASSWORD
+
+    // 6. hash new password
     const passwordHash = await hashValue(body.password);
-    // 8. UPDATE PASSWORD
-    await authRepo.updatePassword(user.userId, passwordHash);
-    // 9. MARK TOKEN USED
-    token.used = true;
-    await token.save();
-    if (token.used) {
-      await verificationRepo.deleteToken(token._id);
-    }
-    // 10. SUCCESS RESPONSE
+
+    // 7. update password in MongoDB
+    await authRepo.updatePassword(body.email, passwordHash);
+
+    // 8. cleanup Redis
+    await verificationRepo.deleteOTP("PASSWORD_RESET", body.email);
+
     return {
       message: "Password reset successful. You can now login.",
     };

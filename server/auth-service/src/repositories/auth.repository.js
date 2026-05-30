@@ -12,9 +12,9 @@ export class AuthRepository {
   async findByUserId(userId) {
     return AuthIdentity.findOne({ userId });
   }
-  async verifyEmail(userId) {
+  async verifyEmail(email) {
     return AuthIdentity.findOneAndUpdate(
-      { userId },
+      { email },
       {
         isEmailVerified: true,
       },

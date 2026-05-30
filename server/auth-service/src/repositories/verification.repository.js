@@ -1,31 +1,63 @@
-import VerificationToken from "../models/verificationToken.model.js";
-import authIdentityModel from "../models/authIdentity.model.js";
+import redisClient from "../config/redis.js";
 export class VerificationRepository {
-  async create(data) {
-    return VerificationToken.create(data);
+  // STORE TEMP REGISTRATION DATA
+  async storeTempRegistration(userId, data) {
+    await redisClient.setEx(
+      `temp:register:${userId}`,
+      600, // 10 mins
+      JSON.stringify(data)
+    );
   }
-  async findValidToken(userId, type) {
-    return VerificationToken.findOne({
-      userId,
-      type,
-      used: false,
-      expiresAt: { $gt: new Date() },
-    }).sort({ createdAt: -1 });
+  // GET TEMP REGISTRATION DATA
+  async getTempRegistration(userId) {
+    const data = await redisClient.get(`temp:register:${userId}`);
+    return data ? JSON.parse(data) : null;
   }
-  async markUsed(id) {
-    return VerificationToken.updateOne({ _id: id }, { used: true });
+  // DELETE TEMP REGISTRATION DATA
+  async deleteTempRegistration(userId) {
+    await redisClient.del(`temp:register:${userId}`);
   }
-  async incrementAttempts(id) {
-    return VerificationToken.updateOne({ _id: id }, { $inc: { attempts: 1 } });
+  // STORE OTP
+  async storeOTP(type, email, data) {
+    await redisClient.setEx(
+      `otp:${type}:${email}`,
+      600, // 10 mins
+      JSON.stringify({
+        ...data,
+        used: false,
+        attempts: 0,
+        resendCount: 0,
+        blockedUntil: null,
+        resetVerified: false,
+        updatedAt: new Date(),
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      })
+    );
   }
+  // GET OTP
+  async getOTP(type, email) {
+    const data = await redisClient.get(`otp:${type}:${email}`);
+    return data ? JSON.parse(data) : null;
+  }
+  // UPDATE OTP
+  async updateOTP(type, email, updates) {
+    const existing = await this.getOTP(type, email);
+    if (!existing) return null;
 
-  async findToken(userId, type) {
-    return VerificationToken.findOne({
-      userId,
-      type,
-    });
+    const ttl = await redisClient.ttl(`otp:${type}:${email}`);
+    await redisClient.setEx(
+      `otp:${type}:${email}`,
+      ttl, // keep remaining TTL
+      JSON.stringify({ ...existing, ...updates, updatedAt: new Date() })
+    );
   }
-  async deleteToken(id) {
-    return VerificationToken.findByIdAndDelete(id);
+  // DELETE OTP
+  async deleteOTP(type, email) {
+    await redisClient.del(`otp:${type}:${email}`);
+  }
+  // CHECK EMAIL IN PROGRESS
+  async isRegistrationInProgress(email) {
+    const keys = await redisClient.keys(`otp:EMAIL_VERIFICATION:${email}`);
+    return keys.length > 0;
   }
 }
