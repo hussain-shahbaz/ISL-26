@@ -33,8 +33,8 @@ class GeminiGradingService:
     def __init__(self):
         """Initialize Gemini client"""
 
+        print("GEMINI API KEY ============== ",Config.GEMINI_API_KEY)
         if not Config.GEMINI_API_KEY:
-            print("GEMINI API KEY ============== ",Config.GEMINI_API_KEY)
             raise ValueError("GEMINI_API_KEY not configured")
 
         self.llm = ChatGoogleGenerativeAI(
@@ -46,6 +46,16 @@ class GeminiGradingService:
     def _get_system_prompt(self, mode: str) -> str:
         """Return grading instructions based on mode"""
 
+        base_feedback_prompt = """
+Feedback Guidelines:
+- Use professional, constructive language
+- Be concise and specific (2-3 sentences max)
+- If answer is incorrect: Briefly explain what went wrong and what the correct approach should be
+- If answer is correct but marks are low (< 80%): Suggest specific improvements and missing elements
+- If answer is correct and marks are high (>= 80%): Acknowledge correctness and highlight strengths
+- Always maintain an encouraging but honest tone
+"""
+
         if mode == "strict":
             return """
 You are a strict exam grader.
@@ -56,7 +66,7 @@ Rules:
 - Partial credit only when major concepts are correct
 - Score zero for fundamentally incorrect answers
 - Be strict but fair
-"""
+""" + base_feedback_prompt
 
         elif mode == "lenient":
             return """
@@ -68,7 +78,7 @@ Rules:
 - Reward partially correct reasoning
 - Ignore small wording issues
 - Encourage students
-"""
+""" + base_feedback_prompt
 
         return """
 You are a balanced exam grader.
@@ -81,7 +91,7 @@ Rules:
 - Balance:
   - 60% technical accuracy
   - 40% conceptual understanding
-"""
+""" + base_feedback_prompt
 
     def grade_answer(
         self,

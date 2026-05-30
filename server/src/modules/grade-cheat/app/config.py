@@ -15,7 +15,7 @@ class Config:
     
     # Gemini
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AQ.Ab8RN6J1-3yofYRokc1PbxStqj0ndIIXE6QXGIy9LyUjY1TVuA")
-    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     
     # MongoDB
     MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
@@ -27,7 +27,7 @@ class Config:
     NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "neo4jneo4j")
     
     # Redis
-    REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    REDIS_URL = os.getenv("REDIS_URL", "redis://172.28.244.79:6379/0")
     
     # Chroma
     CHROMA_MODE = os.getenv("CHROMA_MODE", "ephemeral")

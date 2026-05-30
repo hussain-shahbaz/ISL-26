@@ -25,8 +25,8 @@ class RedisClient:
         """Initialize Redis connection"""
         if self._client is None:
             try:
-                # redis 4.5.4 uses RESP2 by default, no HELLO command
                 self._client = redis.from_url(Config.REDIS_URL, decode_responses=True)
+                self._client.ping()
                 logger.info(f"Connected to Redis: {Config.REDIS_URL}")
             except Exception as e:
                 logger.error(f"Failed to connect to Redis: {e}")
