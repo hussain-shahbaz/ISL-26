@@ -8,7 +8,7 @@ from flask import Blueprint, jsonify, request
 from app.data_provider import DataProvider
 from app.models import ExamResultRepository
 from app.services import ExamAnalysisService
-from app.services.task_tracker import TaskTracker
+from app.services.task_tracker import ExamTaskAlreadyRunning, TaskTracker
 from app.tasks.grading_tasks import grade_exam_task
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,6 @@ grading_bp = Blueprint("grading", __name__, url_prefix="/api")
 analysis_service = ExamAnalysisService()
 task_tracker = TaskTracker()
 result_repo = ExamResultRepository()
-data_provider = DataProvider()
 
 VALID_MODES = ("strict", "lenient", "medium")
 
@@ -30,7 +29,7 @@ def health():
 
 @grading_bp.route("/results", methods=["GET"])
 def get_results():
-    """GET /api/results?examId=exam_001"""
+    """Return stored grading results for an exam."""
     exam_id = request.args.get("examId")
     if not exam_id:
         return jsonify({"error": "examId parameter required"}), 400
@@ -47,25 +46,21 @@ def get_results():
 
 @grading_bp.route("/analytics", methods=["GET"])
 def get_analytics():
-    """GET /api/analytics?examId=exam_001"""
+    """Return class analytics for a graded exam."""
     exam_id = request.args.get("examId")
     if not exam_id:
         return jsonify({"error": "examId parameter required"}), 400
 
-    analysis = analysis_service.get_analysis(exam_id)
-    if not analysis:
+    data = analysis_service.get_analysis(exam_id)
+    if not data:
         return jsonify({"success": False, "error": "Analytics not found"}), 404
 
-    return jsonify({"success": True, "data": analysis}), 200
+    return jsonify({"success": True, "data": data}), 200
 
 
 @grading_bp.route("/grade/async", methods=["POST"])
 def grade_exam_async():
-    """
-    Start async grading.
-
-    Query params: examId (required), mode (strict|lenient|medium), instructions (optional)
-    """
+    """Start async grading + plagiarism (one active task per examId)."""
     exam_id = request.args.get("examId")
     mode = request.args.get("mode", "medium")
     instructions = request.args.get("instructions")
@@ -76,22 +71,39 @@ def grade_exam_async():
         return jsonify({"error": "Invalid mode"}), 400
 
     try:
-        questions = data_provider.get_exam_questions(exam_id)
-        submissions = data_provider.get_exam_submissions(exam_id)
+        provider = DataProvider()
+        questions = provider.get_exam_questions(exam_id)
+        submissions = provider.get_exam_submissions(exam_id)
         if not questions or not submissions:
             return jsonify({"error": f"No data found for exam {exam_id}"}), 404
 
-        total_answers = len(questions) * len(submissions)
-        task_id = task_tracker.create_task(exam_id, mode, total_answers)
+        if result_repo.exists_for_exam(exam_id):
+            return jsonify({
+                "error": "Exam has already been graded",
+                "examId": exam_id,
+                "resultsUrl": f"/api/results?examId={exam_id}",
+            }), 409
+
+        total = len(questions) * len(submissions)
+        task_id = task_tracker.create_task(
+            exam_id, mode, total, questions=questions, submissions=submissions,
+        )
         grade_exam_task.delay(exam_id, mode, task_id, instructions)
 
-        logger.info("Started grading task %s for exam %s", task_id, exam_id)
         return jsonify({
             "success": True,
             "taskId": task_id,
             "progressUrl": f"/api/grade/progress?taskId={task_id}",
-            "estimatedQuestions": total_answers,
+            "estimatedQuestions": total,
         }), 202
+
+    except ExamTaskAlreadyRunning as exc:
+        return jsonify({
+            "error": "A grading task is already running for this exam",
+            "examId": exc.exam_id,
+            "taskId": exc.task_id,
+            "progressUrl": f"/api/grade/progress?taskId={exc.task_id}",
+        }), 409
 
     except Exception as exc:
         logger.error("Failed to start grading: %s", exc, exc_info=True)
@@ -100,7 +112,7 @@ def grade_exam_async():
 
 @grading_bp.route("/grade/progress", methods=["GET"])
 def get_grading_progress():
-    """GET /api/grade/progress?taskId=<uuid>"""
+    """Poll task status by taskId."""
     task_id = request.args.get("taskId")
     if not task_id:
         return jsonify({"error": "taskId parameter required"}), 400
@@ -110,19 +122,17 @@ def get_grading_progress():
         if not progress:
             return jsonify({"error": "Task not found"}), 404
 
-        created_at = datetime.fromisoformat(progress["created_at"])
-        response = {
+        created = datetime.fromisoformat(progress["created_at"])
+        resp = {
             "status": progress["status"],
             "progress": progress.get("progress", {}),
-            "elapsed": round((datetime.now() - created_at).total_seconds(), 1),
+            "elapsed": round((datetime.now() - created).total_seconds(), 1),
         }
-
         if progress["status"] == "completed" and progress.get("result"):
-            response["result"] = progress["result"]
+            resp["result"] = progress["result"]
         if progress["status"] == "failed" and progress.get("error"):
-            response["error"] = progress["error"]
-
-        return jsonify(response), 200
+            resp["error"] = progress["error"]
+        return jsonify(resp), 200
 
     except Exception as exc:
         logger.error("Failed to read progress: %s", exc)
@@ -131,7 +141,7 @@ def get_grading_progress():
 
 @grading_bp.route("/grade/cleanup", methods=["DELETE"])
 def cleanup_grading_task():
-    """DELETE /api/grade/cleanup?taskId=<uuid>"""
+    """Delete a task record and release exam lock if held."""
     task_id = request.args.get("taskId")
     if not task_id:
         return jsonify({"error": "taskId parameter required"}), 400
@@ -146,7 +156,7 @@ def cleanup_grading_task():
 
 @grading_bp.route("/tasks", methods=["GET"])
 def get_tasks():
-    """GET /api/tasks?examId=exam_001 — grading task history from MongoDB."""
+    """List all grading tasks for an exam."""
     exam_id = request.args.get("examId")
     if not exam_id:
         return jsonify({"error": "examId parameter required"}), 400

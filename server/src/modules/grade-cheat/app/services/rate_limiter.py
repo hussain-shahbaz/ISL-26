@@ -1,66 +1,50 @@
-"""Rate limiter for Gemini API to stay within free tier quotas"""
+"""Rate limit + retry for LLM API calls."""
 
-import time
 import logging
+import time
 from threading import Lock
-from datetime import datetime, timedelta
+
+from app.config import Config
+from app.gemini_keys import is_quota_error
 
 logger = logging.getLogger(__name__)
 
 
 class RateLimiter:
-    """Rate limiter for Gemini API (5 requests per minute for free tier)"""
-    
-    def __init__(self, requests_per_minute: int = 5):
-        """
-        Initialize rate limiter
-        
-        Args:
-            requests_per_minute: Max requests allowed per minute (default: 5 for free tier)
-        """
-        self.requests_per_minute = requests_per_minute
-        self.min_interval = 60.0 / requests_per_minute  # Seconds between requests
+    def __init__(self, requests_per_minute: int):
+        self.min_interval = 60.0 / requests_per_minute
         self.last_request_time = None
         self.lock = Lock()
-        logger.info(f"Rate limiter initialized: {requests_per_minute} req/min ({self.min_interval:.1f}s interval)")
-    
+
     def wait_if_needed(self):
-        """Wait if necessary to maintain rate limit"""
         with self.lock:
-            if self.last_request_time is None:
-                self.last_request_time = time.time()
-                return 0
-            
-            elapsed = time.time() - self.last_request_time
-            if elapsed < self.min_interval:
-                wait_time = self.min_interval - elapsed
-                logger.debug(f"Rate limit: waiting {wait_time:.1f}s before next request")
-                time.sleep(wait_time)
-            
+            if self.last_request_time is not None:
+                elapsed = time.time() - self.last_request_time
+                if elapsed < self.min_interval:
+                    time.sleep(self.min_interval - elapsed)
             self.last_request_time = time.time()
-            return elapsed
-    
-    def reset(self):
-        """Reset the rate limiter"""
-        with self.lock:
-            self.last_request_time = None
-            logger.info("Rate limiter reset")
 
 
-# Global rate limiter instance
-_rate_limiter = RateLimiter(requests_per_minute=5)
+_limiter = RateLimiter(Config.GEMINI_RATE_LIMIT_RPM)
 
 
-def rate_limit():
-    """Decorator to apply rate limiting to functions"""
-    def decorator(func):
-        def wrapper(*args, **kwargs):
-            _rate_limiter.wait_if_needed()
-            return func(*args, **kwargs)
-        return wrapper
-    return decorator
+def call_with_limit(fn):
+    """Wait for rate limit, then run fn()."""
+    _limiter.wait_if_needed()
+    return fn()
 
 
-def get_rate_limiter() -> RateLimiter:
-    """Get the global rate limiter instance"""
-    return _rate_limiter
+def retry_with_backoff(fn, label: str = "llm", max_retries: int = 3, wait_seconds: int = 60):
+    """Retry fn on quota/rate-limit errors."""
+    last_error = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            return call_with_limit(fn)
+        except Exception as exc:
+            last_error = exc
+            if is_quota_error(exc) and attempt < max_retries:
+                logger.warning("[%s] quota/rate limit — retry %d/%d in %ds", label, attempt, max_retries, wait_seconds)
+                time.sleep(wait_seconds)
+                continue
+            raise
+    raise last_error  # type: ignore[misc]

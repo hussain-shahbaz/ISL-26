@@ -1,11 +1,28 @@
 """MongoDB database client and operations"""
 
-from pymongo import MongoClient
-from app.config import Config
-from typing import List, Dict, Any, Optional
 import logging
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from bson import ObjectId
+from pymongo import MongoClient
+
+from app.config import Config
 
 logger = logging.getLogger(__name__)
+
+
+def to_json(value: Any) -> Any:
+    """Convert MongoDB types (ObjectId, datetime) for JSON responses."""
+    if isinstance(value, ObjectId):
+        return str(value)
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {k: to_json(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [to_json(v) for v in value]
+    return value
 
 
 class MongoDBClient:
@@ -58,10 +75,19 @@ class ExamResultRepository:
     def find_by_exam(self, exam_id: str) -> List[Dict]:
         """Get all results for an exam"""
         try:
-            return list(self.collection.find({'examId': exam_id}))
+            docs = list(self.collection.find({"examId": exam_id}))
+            return [to_json(doc) for doc in docs]
         except Exception as e:
             logger.error(f"Error finding results: {e}")
             return []
+
+    def exists_for_exam(self, exam_id: str) -> bool:
+        """True if this exam already has stored grading results."""
+        try:
+            return self.collection.count_documents({"examId": exam_id}, limit=1) > 0
+        except Exception as e:
+            logger.error(f"Error checking exam results: {e}")
+            return False
 
 
 class ExamAnalysisRepository:
@@ -89,7 +115,8 @@ class ExamAnalysisRepository:
     def find_by_exam(self, exam_id: str) -> Optional[Dict]:
         """Get analysis for an exam"""
         try:
-            return self.collection.find_one({'examId': exam_id})
+            doc = self.collection.find_one({"examId": exam_id})
+            return to_json(doc) if doc else None
         except Exception as e:
             logger.error(f"Error finding analysis: {e}")
             return None
@@ -127,19 +154,17 @@ class GradingTaskRepository:
     def find_by_task_id(self, task_id: str) -> Optional[Dict]:
         """Get a grading task by its task_id"""
         try:
-            return self.collection.find_one({'task_id': task_id})
+            doc = self.collection.find_one({"task_id": task_id})
+            return to_json(doc) if doc else None
         except Exception as e:
             logger.error(f"Error finding grading task: {e}")
             return None
-    
+
     def find_by_exam(self, exam_id: str) -> List[Dict]:
         """Get all grading tasks for an exam, newest first"""
         try:
-            return list(
-                self.collection.find(
-                    {'exam_id': exam_id}
-                ).sort('created_at', -1)
-            )
+            docs = list(self.collection.find({"exam_id": exam_id}).sort("created_at", -1))
+            return [to_json(doc) for doc in docs]
         except Exception as e:
             logger.error(f"Error finding grading tasks by exam: {e}")
             return []

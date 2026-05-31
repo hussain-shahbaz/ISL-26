@@ -1,5 +1,6 @@
 .venv
 .env
 *.md
+!TECHNICAL.md
 **/__pycache__/
 *.bat

@@ -1,101 +1,81 @@
-"""Gemini-based grading service using latest LangChain APIs"""
+"""Text grading: Gemini first (google-genai), Grok fallback (requests)."""
 
+import json
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, Optional
 
+import requests
+from google import genai
+from google.genai import types
 from pydantic import BaseModel, Field
 
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_google_genai import ChatGoogleGenerativeAI
-
 from app.config import Config
-from app.services.rate_limiter import get_rate_limiter
+from app.gemini_keys import QuotaExhaustedError, run_with_retry
+from app.services.rate_limiter import call_with_limit, retry_with_backoff
 
 logger = logging.getLogger(__name__)
 
-
-class QuotaExhaustedError(Exception):
-    """Raised when the Gemini API quota/credits are exhausted (429 RESOURCE_EXHAUSTED)"""
-    pass
+__all__ = ["GeminiGradingService", "GrokGradingService"]
 
 
 class GradingOutput(BaseModel):
-    """Structured output from Gemini grading"""
+    score: float
+    isCorrect: bool
+    feedback: str
+    whyWrong: Optional[str] = None
+    reasoning: str
+    confidence: float
 
-    score: float = Field(description="Numerical score from 0 to max marks")
-    isCorrect: bool = Field(description="Whether the answer is correct")
-    feedback: str = Field(description="Constructive feedback")
-    whyWrong: Optional[str] = Field(
-        default=None,
-        description="Explanation of mistakes if incorrect"
+
+_SYSTEM = {
+    "strict": "Strict exam grader. Require correct terminology.",
+    "lenient": "Lenient grader. Focus on concepts; accept paraphrasing.",
+    "medium": "Balanced grader. Mix accuracy and understanding.",
+}
+
+
+def _system_prompt(mode: str, extra: Optional[str]) -> str:
+    text = _SYSTEM.get(mode, _SYSTEM["medium"]) + " Keep feedback to 2-3 sentences."
+    if extra:
+        text += f"\n\nAdditional:\n{extra}"
+    return text
+
+
+def _user_prompt(question_text, reference_answer, submitted_answer, marks) -> str:
+    return (
+        f"Question: {question_text}\n"
+        f"Reference: {reference_answer}\n"
+        f"Student: {submitted_answer}\n"
+        f"Max marks: {marks}\n"
+        "Return JSON only with keys: score, isCorrect, feedback, whyWrong, reasoning, confidence."
     )
-    reasoning: str = Field(description="Detailed grading reasoning")
-    confidence: float = Field(description="Confidence level from 0 to 1")
 
 
-class GeminiGradingService:
-    """Service for grading answers using Gemini"""
+def _parse_grading_json(content: str) -> GradingOutput:
+    text = (content or "").strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+    return GradingOutput.model_validate(json.loads(text))
 
-    def __init__(self):
-        """Initialize Gemini client"""
-        if not Config.GEMINI_API_KEY:
-            raise ValueError("GEMINI_API_KEY not configured")
 
-        self.llm = ChatGoogleGenerativeAI(
-            model=Config.GEMINI_MODEL,
-            google_api_key=Config.GEMINI_API_KEY,
-            temperature=0.3,
-        )
+def _format_result(result: GradingOutput, marks: int) -> Dict[str, Any]:
+    score = max(0, min(result.score, marks))
+    return {
+        "success": True,
+        "data": {
+            "score": score,
+            "maxMarks": marks,
+            "isCorrect": result.isCorrect,
+            "feedback": result.feedback,
+            "whyWrong": result.whyWrong,
+            "reasoning": result.reasoning,
+            "confidence": result.confidence,
+        },
+    }
 
-    def _get_system_prompt(self, mode: str) -> str:
-        """Return grading instructions based on mode"""
 
-        base_feedback_prompt = """
-Feedback Guidelines:
-- Use professional, constructive language
-- Be concise and specific (2-3 sentences max)
-- If answer is incorrect: Briefly explain what went wrong and what the correct approach should be
-- If answer is correct but marks are low (< 80%): Suggest specific improvements and missing elements
-- If answer is correct and marks are high (>= 80%): Acknowledge correctness and highlight strengths
-- Always maintain an encouraging but honest tone
-"""
-
-        if mode == "strict":
-            return """
-You are a strict exam grader.
-
-Rules:
-- Require technically correct terminology
-- Deduct marks for missing keywords
-- Partial credit only when major concepts are correct
-- Score zero for fundamentally incorrect answers
-- Be strict but fair
-""" + base_feedback_prompt
-
-        elif mode == "lenient":
-            return """
-You are a lenient exam grader.
-
-Rules:
-- Focus on conceptual understanding
-- Accept paraphrasing and synonyms
-- Reward partially correct reasoning
-- Ignore small wording issues
-- Encourage students
-""" + base_feedback_prompt
-
-        return """
-You are a balanced exam grader.
-
-Rules:
-- Evaluate both conceptual understanding and technical correctness
-- Accept reasonable paraphrasing
-- Give partial credit appropriately
-- Deduct for missing core concepts
-- Balance:
-  - 60% technical accuracy
-  - 40% conceptual understanding
-""" + base_feedback_prompt
+class GrokGradingService:
+    """Grade via xAI Grok HTTP API."""
 
     def grade_answer(
         self,
@@ -104,132 +84,100 @@ Rules:
         submitted_answer: str,
         marks: int,
         mode: str = "medium",
-        additional_instructions: str = None,
+        additional_instructions: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
-        Grade a single answer
-        
-        Args:
-            question_text: The exam question
-            reference_answer: Expected/reference answer
-            submitted_answer: Student's answer
-            marks: Total marks for this question
-            mode: Grading mode ('strict', 'lenient', 'medium')
-            additional_instructions: Optional custom grading instructions
-        """
+        if not Config.GROK_API_KEY:
+            return {"success": False, "error": "GROK_API_KEY not configured"}
+
+        if mode not in _SYSTEM:
+            mode = "medium"
+
+        system = _system_prompt(mode, additional_instructions)
+        user = _user_prompt(question_text, reference_answer, submitted_answer, marks)
+
+        def _call():
+            resp = requests.post(
+                f"{Config.GROK_BASE_URL.rstrip('/')}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {Config.GROK_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": Config.GROK_MODEL,
+                    "messages": [
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": user},
+                    ],
+                    "temperature": 0.3,
+                },
+                timeout=Config.GROK_TIMEOUT,
+            )
+            resp.raise_for_status()
+            return _parse_grading_json(resp.json()["choices"][0]["message"]["content"])
 
         try:
-            if mode not in ["strict", "medium", "lenient"]:
-                mode = "medium"
-            
-            system_prompt = self._get_system_prompt(mode)
-            
-            # Append additional instructions if provided
-            if additional_instructions:
-                system_prompt += f"\n\nAdditional Instructions:\n{additional_instructions}"
-
-            prompt = ChatPromptTemplate.from_messages(
-                [
-                    ("system", system_prompt),
-                    (
-                        "human",
-                        """
-Question:
-{question_text}
-
-Reference Answer:
-{reference_answer}
-
-Student Answer:
-{submitted_answer}
-
-Maximum Marks:
-{max_marks}
-
-Evaluate the answer carefully and return structured grading output.
-""",
-                    ),
-                ]
+            result = retry_with_backoff(
+                _call,
+                label="grok",
+                max_retries=Config.GEMINI_MAX_RETRIES,
+                wait_seconds=Config.GEMINI_RETRY_WAIT_SECONDS,
             )
+            logger.info("Graded via Grok")
+            return _format_result(result, marks)
+        except Exception as exc:
+            logger.exception("Grok grading failed")
+            return {"success": False, "error": str(exc)}
 
-            structured_llm = self.llm.with_structured_output(
-                GradingOutput
+
+class GeminiGradingService:
+    """Grade via Gemini API; falls back to Grok on quota/errors."""
+
+    def __init__(self):
+        self._grok = GrokGradingService()
+
+    def _call_gemini(self, api_key, question_text, reference_answer, submitted_answer, marks, mode, extra):
+        system = _system_prompt(mode, extra)
+        user = _user_prompt(question_text, reference_answer, submitted_answer, marks)
+
+        def _invoke():
+            client = genai.Client(api_key=api_key)
+            response = client.models.generate_content(
+                model=Config.GEMINI_MODEL,
+                contents=user,
+                config=types.GenerateContentConfig(
+                    system_instruction=system,
+                    temperature=0.3,
+                    response_mime_type="application/json",
+                ),
             )
+            return _parse_grading_json(response.text)
 
-            chain = prompt | structured_llm
+        return call_with_limit(_invoke)
 
-            # Apply rate limiting to respect free tier quota (5 req/min)
-            rate_limiter = get_rate_limiter()
-            rate_limiter.wait_if_needed()
-            
-            result: GradingOutput = chain.invoke(
-                {
-                    "question_text": question_text,
-                    "reference_answer": reference_answer,
-                    "submitted_answer": submitted_answer,
-                    "max_marks": marks,
-                }
-            )
-
-            score = max(0, min(result.score, marks))
-
-            return {
-                "success": True,
-                "data": {
-                    "score": score,
-                    "maxMarks": marks,
-                    "isCorrect": result.isCorrect,
-                    "feedback": result.feedback,
-                    "whyWrong": result.whyWrong,
-                    "reasoning": result.reasoning,
-                    "confidence": result.confidence,
-                },
-            }
-
-        except Exception as e:
-            error_str = str(e).lower()
-            
-            # Detect quota/rate limit exhaustion and raise specific error
-            if any(keyword in error_str for keyword in [
-                'resource_exhausted', '429', 'quota exceeded', 'rate limit'
-            ]):
-                logger.error("Gemini API quota exhausted - stopping grading")
-                raise QuotaExhaustedError(
-                    "Gemini API credits/quota exhausted. "
-                    "You have exceeded the free tier limit. "
-                    "Please wait or upgrade your plan."
-                ) from e
-            
-            logger.exception("Error grading answer")
-
-            return {
-                "success": False,
-                "error": str(e),
-            }
-
-    def grade_multiple(
+    def grade_answer(
         self,
-        questions: List[Dict[str, Any]],
+        question_text: str,
+        reference_answer: str,
+        submitted_answer: str,
+        marks: int,
         mode: str = "medium",
+        additional_instructions: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
-        Grade multiple answers
-        """
+        if mode not in _SYSTEM:
+            mode = "medium"
 
-        results = []
+        args = (question_text, reference_answer, submitted_answer, marks, mode, additional_instructions)
 
-        for q in questions:
-            result = self.grade_answer(
-                question_text=q.get("question_text", ""),
-                reference_answer=q.get("reference_answer", ""),
-                submitted_answer=q.get("submitted_answer", ""),
-                marks=q.get("marks", 0),
-                mode=mode,
-            )
+        if Config.GEMINI_API_KEYS:
+            try:
+                result = run_with_retry(
+                    lambda key: self._call_gemini(key, *args),
+                    label="gemini",
+                )
+                return _format_result(result, marks)
+            except QuotaExhaustedError:
+                logger.warning("Gemini quota exhausted — using Grok")
+            except Exception as exc:
+                logger.warning("Gemini failed (%s) — using Grok", exc)
 
-            results.append(result)
-
-        return {
-            "success": all(r.get("success") for r in results),
-            "results": results,
-        }
+        return self._grok.grade_answer(*args)

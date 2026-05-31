@@ -1,114 +1,70 @@
-"""Redis client and cache management"""
+"""Redis connection and key helpers for task progress + exam locks."""
 
-import redis
 import json
 import logging
-from typing import Dict, Any, Optional
-from datetime import datetime, timedelta
+from typing import Any, Dict, Optional
+
+import redis
+
 from app.config import Config
 
 logger = logging.getLogger(__name__)
 
+_client = None
 
-class RedisClient:
-    """Redis client singleton for caching and task tracking"""
-    
-    _instance = None
-    _client = None
-    
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-    
-    def __init__(self):
-        """Initialize Redis connection"""
-        if self._client is None:
-            try:
-                self._client = redis.from_url(Config.REDIS_URL, decode_responses=True)
-                self._client.ping()
-                logger.info(f"Connected to Redis: {Config.REDIS_URL}")
-            except Exception as e:
-                logger.error(f"Failed to connect to Redis: {e}")
-                raise
-    
-    @property
-    def client(self):
-        """Get Redis client instance"""
-        return self._client
-    
-    def set_task_progress(self, task_id: str, progress: Dict[str, Any], ttl: int = 86400) -> bool:
-        """
-        Store task progress in Redis
-        
-        Args:
-            task_id: Unique task identifier
-            progress: Progress data dictionary
-            ttl: Time-to-live in seconds (default: 24 hours)
-        """
-        try:
-            key = f"grading:{task_id}"
-            self._client.setex(key, ttl, json.dumps(progress))
-            return True
-        except Exception as e:
-            logger.error(f"Error setting task progress: {e}")
-            return False
-    
-    def get_task_progress(self, task_id: str) -> Optional[Dict[str, Any]]:
-        """Retrieve task progress from Redis"""
-        try:
-            key = f"grading:{task_id}"
-            data = self._client.get(key)
-            return json.loads(data) if data else None
-        except Exception as e:
-            logger.error(f"Error getting task progress: {e}")
-            return None
-    
-    def delete_task_progress(self, task_id: str) -> bool:
-        """Delete task progress from Redis"""
-        try:
-            key = f"grading:{task_id}"
-            self._client.delete(key)
-            return True
-        except Exception as e:
-            logger.error(f"Error deleting task progress: {e}")
-            return False
-    
-    def set_cache(self, key: str, value: Any, ttl: int = 3600) -> bool:
-        """Store any data in cache"""
-        try:
-            self._client.setex(key, ttl, json.dumps(value) if not isinstance(value, str) else value)
-            return True
-        except Exception as e:
-            logger.error(f"Error setting cache: {e}")
-            return False
-    
-    def get_cache(self, key: str) -> Optional[Any]:
-        """Retrieve cached data"""
-        try:
-            data = self._client.get(key)
-            if data:
-                try:
-                    return json.loads(data)
-                except:
-                    return data
-            return None
-        except Exception as e:
-            logger.error(f"Error getting cache: {e}")
-            return None
-    
-    def delete_cache(self, key: str) -> bool:
-        """Delete cached data"""
-        try:
-            self._client.delete(key)
-            return True
-        except Exception as e:
-            logger.error(f"Error deleting cache: {e}")
-            return False
-    
-    def health_check(self) -> bool:
-        """Check Redis connection health"""
-        try:
-            return self._client.ping()
-        except:
-            return False
+
+def _conn():
+    global _client
+    if _client is None:
+        _client = redis.from_url(Config.REDIS_URL, decode_responses=True)
+        _client.ping()
+        logger.info("Connected to Redis: %s", Config.REDIS_URL)
+    return _client
+
+
+def _task_key(task_id: str) -> str:
+    return f"grading:{task_id}"
+
+
+def _exam_key(exam_id: str) -> str:
+    return f"grading:exam:{exam_id}"
+
+
+def set_task_progress(task_id: str, progress: Dict[str, Any], ttl: int = 86400) -> bool:
+    try:
+        _conn().setex(_task_key(task_id), ttl, json.dumps(progress))
+        return True
+    except Exception as exc:
+        logger.error("Redis set task failed: %s", exc)
+        return False
+
+
+def get_task_progress(task_id: str) -> Optional[Dict[str, Any]]:
+    try:
+        raw = _conn().get(_task_key(task_id))
+        return json.loads(raw) if raw else None
+    except Exception as exc:
+        logger.error("Redis get task failed: %s", exc)
+        return None
+
+
+def delete_task_progress(task_id: str) -> bool:
+    try:
+        _conn().delete(_task_key(task_id))
+        return True
+    except Exception as exc:
+        logger.error("Redis delete task failed: %s", exc)
+        return False
+
+
+def acquire_exam_lock(exam_id: str, task_id: str, ttl: int = 86400) -> bool:
+    """Set exam lock if none exists (one active grading task per exam)."""
+    return bool(_conn().set(_exam_key(exam_id), task_id, nx=True, ex=ttl))
+
+
+def release_exam_lock(exam_id: str) -> None:
+    _conn().delete(_exam_key(exam_id))
+
+
+def get_exam_lock_task_id(exam_id: str) -> Optional[str]:
+    return _conn().get(_exam_key(exam_id))
