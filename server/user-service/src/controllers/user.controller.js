@@ -4,6 +4,14 @@ import {
   approvalSchema,
   registerProfileSchema,
 } from "../validators/user.validator.js";
+import {
+  formatStudent,
+  formatInstructor,
+  formatPending,
+  formatProfile,
+  buildPagination,
+} from "../utils/format.js";
+import {paginationSchema} from "../validators/user.validator.js";
 class UserController {
   async register(req, res) {
     try {
@@ -11,17 +19,23 @@ class UserController {
       if (!parsed.success) {
         return res.status(400).json({
           success: false,
-          message: "Validation failed",
+          message: "Validation failed jfnjf",
           errors: parsed.error.flatten().fieldErrors,
         });
       }
-      const profile = await userService.createProfile(parsed.data);
+      const profile = await userService.createProfile(req.body);
       return res.status(201).json({
         success: true,
         message: "Profile created successfully",
         userId: profile.id,
       });
     } catch (error) {
+      if (error.message === "CANNOT_SELF_REGISTER_AS_ADMIN") {
+        return res.status(403).json({
+          success: false,
+          message: "Cannot self-register as admin",
+        });
+      }
       if (error.message === "PROFILE_ALREADY_EXISTS") {
         return res.status(409).json({
           success: false,
@@ -55,7 +69,14 @@ class UserController {
   }
   async getProfile(req, res) {
     try {
-      const userId = "3f5b9d9a-7c4b-4abc-a2f3-5e0c6d8f9b12";
+      console.log("Decoded token payload:", req.user);
+      const userId = req.user?.userId || req.user?.id || req.user?.sub;
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: "Access token missing user id",
+        });
+      }
       const profile = await userService.getProfile(userId);
       return res.status(200).json({
         success: true,
@@ -96,14 +117,18 @@ class UserController {
   }
   async completeProfile(req, res) {
     try {
-      // inject role from JWT into body so schema can discriminate
-      const userId = "2f4b9d9a-7c4b-4abc-a2f3-5e0c6d8f7b11";
-      const role = "INSTRUCTOR";
+      const { userId, role: rawRole } = req.user;
+      if (!userId || !rawRole) {
+        return res.status(401).json({
+          success: false,
+          message: "Invalid token payload",
+        });
+      }
+      const role = String(rawRole).toUpperCase();
       const body = {
         ...req.body,
         role,
       };
-      console.log("Received complete profile request with body:", req.body);
       const parsed = completeProfileSchema.safeParse(body);
       if (!parsed.success) {
         return res.status(400).json({
@@ -138,7 +163,7 @@ class UserController {
       if (error.message === "PROFILE_NOT_FOUND") {
         return res.status(404).json({
           success: false,
-          message: "Profile not found",
+          message: "Profile notgbg found",
         });
       }
 
@@ -184,11 +209,18 @@ class UserController {
 
       const { userId } = req.params;
       const { status } = parsed.data;
-      const approvedBy ="7c426e12-5b70-445d-b007-87be55ea1ab2";
+      const approverId = req.user?.userId || req.user?.id || req.user?.sub;
+
+      if (!approverId) {
+        return res.status(401).json({
+          success: false,
+          message: "Unauthenticated: approver id missing from token",
+        });
+      }
 
       const updated = await userService.updateApproval(userId, {
         status,
-        approvedBy,
+        approvedBy: approverId,
       });
 
       return res.status(200).json({
@@ -227,6 +259,125 @@ class UserController {
         });
       }
 
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
+    }
+  }
+  async rejectInstructor(req, res) {
+    const instructor = await userService.rejectInstructor(
+      req.params.id,
+      req.user.userId
+    );
+
+    return res.status(200).json({
+      success: true,
+
+      message: "Instructor rejected successfully",
+
+      data: instructor,
+    });
+  }
+  async getStudents(req, res) {
+    try {
+      const parsed = paginationSchema.safeParse(req.query);
+      if (!parsed.success) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid query params",
+          errors: parsed.error.flatten().fieldErrors,
+        });
+      }
+
+      const { page, limit, search } = parsed.data;
+
+      const { users, total } = await userService.getStudents({
+        university: req.user.university,
+        page,
+        limit,
+        search,
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          users: users.map(formatStudent),
+          pagination: buildPagination({ total, page, limit }),
+        },
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
+    }
+  }
+
+  async getInstructors(req, res) {
+    try {
+      const parsed = paginationSchema.safeParse(req.query);
+      if (!parsed.success) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid query params",
+          errors: parsed.error.flatten().fieldErrors,
+        });
+      }
+
+      const { page, limit, search } = parsed.data;
+
+      const { users, total } = await userService.getInstructors({
+        page,
+        limit,
+        search,
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          users: users.map(formatInstructor),
+          pagination: buildPagination({ total, page, limit }),
+        },
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
+    }
+  }
+
+  async getPendingUsers(req, res) {
+    try {
+      const parsed = paginationSchema.safeParse(req.query);
+      if (!parsed.success) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid query params",
+          errors: parsed.error.flatten().fieldErrors,
+        });
+      }
+
+      const { page, limit } = parsed.data;
+
+      const { users, total } = await userService.getPendingUsers({
+        university: req.user.university,
+        page,
+        limit,
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          users: users.map(formatPending),
+          pagination: buildPagination({ total, page, limit }),
+        },
+      });
+    } catch (error) {
       return res.status(500).json({
         success: false,
         message: "Internal server error",

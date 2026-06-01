@@ -5,6 +5,10 @@ class UserService {
     if (existingProfile) {
       throw new Error("PROFILE_ALREADY_EXISTS");
     }
+    // Prevent users from self-registering as ADMIN
+    if (data.role === "ADMIN") {
+      throw new Error("CANNOT_SELF_REGISTER_AS_ADMIN");
+    }
     if (!data.userId) {
       throw new Error("USER_ID_REQUIRED");
     }
@@ -68,6 +72,50 @@ class UserService {
       status,
       approvedBy,
     });
+  }
+  async getStudents({ university, page, limit, search }) {
+    return await userRepository.findUsers({
+      role: "STUDENT",
+      university,
+      page,
+      limit,
+      search,
+    });
+  }
+
+  async getInstructors({ page, limit, search }) {
+    return await userRepository.findUsers({
+      role: "INSTRUCTOR",
+      page,
+      limit,
+      search,
+    });
+  }
+
+  async getPendingUsers({ university, page, limit }) {
+    return await userRepository.findUsers({
+      role: "INSTRUCTOR", // ← add this
+      approvalStatus: "PENDING",
+      page,
+      limit,
+    });
+  }
+  async rejectInstructor(instructorId, adminId) {
+    const instructor = await userRepository.findById(instructorId);
+
+    if (!instructor) {
+      throw new Error("Instructor not found");
+    }
+
+    if (instructor.role !== "INSTRUCTOR") {
+      throw new Error("User is not an instructor");
+    }
+
+    if (instructor.approvalStatus === "REJECTED") {
+      throw new Error("Instructor already rejected");
+    }
+
+    return userRepo.rejectInstructor(instructorId, adminId);
   }
 }
 export default new UserService();

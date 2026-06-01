@@ -10,6 +10,12 @@ export class AuthController {
         data: user,
       });
     } catch (err) {
+      if (err.message === "CANNOT_SELF_REGISTER_AS_ADMIN") {
+        return res.status(403).json({
+          success: false,
+          message: "Cannot self-register as admin",
+        });
+      }
       next(err);
     }
   }

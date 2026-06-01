@@ -112,7 +112,6 @@ class UserRepository {
     if (user.role === "STUDENT") {
       throw new Error("STUDENTS_DONT_NEED_APPROVAL");
     }
-
     // must be PENDING to approve/reject
     if (user.approvalStatus !== "PENDING") {
       throw new Error("USER_NOT_PENDING");
@@ -122,6 +121,92 @@ class UserRepository {
       status,
       approvedBy,
     });
+  }
+  // async getPendingInstructors() {
+  //   return prisma.userProfile.findMany({
+  //     where: {
+  //       role: "INSTRUCTOR",
+  //       approvalStatus: "PENDING",
+  //       isDeleted: false,
+  //     },
+  //     orderBy: {
+  //       createdAt: "desc",
+  //     },
+  //   });
+  // }
+  // async getAllInstructors() {
+  //   return prisma.userProfile.findMany({
+  //     where: {
+  //       role: "INSTRUCTOR",
+  //       isDeleted: false,
+  //     },
+
+  //     include: {
+  //       identifier: true,
+  //     },
+
+  //     orderBy: {
+  //       createdAt: "desc",
+  //     },
+  //   });
+  // }
+  // async getAllStudents() {
+  //   return prisma.userProfile.findMany({
+  //     where: {
+  //       role: "STUDENT",
+  //       isDeleted: false,
+  //     },
+
+  //     include: {
+  //       identifier: true,
+  //     },
+
+  //     orderBy: {
+  //       createdAt: "desc",
+  //     },
+  //   });
+  // }
+  async rejectInstructor(instructorId, adminId) {
+    return prisma.userProfile.update({
+      where: {
+        id: instructorId,
+      },
+
+      data: {
+        approvalStatus: "REJECTED",
+        approvedAt: new Date(),
+        approvedBy: adminId,
+      },
+    });
+  }
+  async findUsers({ role, approvalStatus, university, page, limit, search }) {
+    const skip = (page - 1) * limit;
+
+    const where = {
+      isDeleted: false,
+      ...(role && { role }),
+      ...(approvalStatus && { approvalStatus }),
+      ...(university && { university }),
+      ...(search && {
+        OR: [
+          { name: { contains: search } },
+          { email: { contains: search } },
+        ],
+      }),
+    };
+
+    const [users, total] = await Promise.all([
+      prisma.userProfile.findMany({
+        where,
+        include: { identifier: true },
+        skip,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.userProfile.count({ where }),
+    ]);
+
+    return { users, total };
   }
 }
 export default new UserRepository();

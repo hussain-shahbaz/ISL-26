@@ -21,7 +21,7 @@ const authIdentitySchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["student", "teacher", "admin"],
+      enum: ["student", "instructor", "admin"],
       required: true
     },
   isEmailVerified: {

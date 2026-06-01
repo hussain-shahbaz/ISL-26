@@ -1,417 +1,321 @@
 # 🔐 Auth Service
 
-Authentication and authorization microservice for the **Secure Online Examination System**. This service handles user identity management, secure authentication, email verification, and password recovery with enterprise-grade security.
-
-## 📋 Overview
-
-This service handles:
-
-- User registration & login
-- JWT-based authentication with refresh tokens
-- Session management with logout capabilities
-- Email verification with OTP
-- Secure password reset flow
-- Multi-device session tracking
-- Rate limiting & abuse prevention
+Authentication microservice for the **Secure Online Examination System**.  
+Handles registration, email verification, login, sessions, and password reset.
 
 ---
 
-## ✨ Features
+## 🛠 Tech Stack
 
-### 🔑 Authentication
-- User registration with validation
-- Secure login with session creation
-- Access token generation (short-lived)
-- Refresh token generation & rotation
-- Session management & tracking
-- Logout from single device
-- Logout from all devices
-
-### 📧 Email Verification
-- OTP-based email verification
-- Gmail OAuth2 integration for sending
-- OTP expiration (configurable)
-- Resend cooldown to prevent spam
-- Attempt limiting with temporary blocking
-- Secure OTP hashing
-
-### 🔄 Password Reset
-- Forgot password flow with OTP
-- Reset OTP verification
-- Secure password reset
-- Session validation for recovery
-
-### 🛡️ Security Features
-- **bcrypt** password hashing with salt rounds
-- **OTP** hashing for secure verification
-- **JWT** authentication (HS256)
-- **Refresh token** rotation
-- Secure session handling
-- **Zod** request validation
-- Rate limiting logic
-- Token invalidation/blacklisting
-- Session revocation
-
----
-
-## 🛠️ Tech Stack
-
-| Component | Technology |
-|-----------|------------|
-| **Runtime** | Node.js |
-| **Framework** | Express.js |
-| **Database** | MongoDB |
-| **ORM** | Prisma |
-| **Authentication** | JWT (jsonwebtoken) |
-| **Password Hashing** | bcrypt |
-| **Email Service** | Nodemailer + Gmail OAuth2 |
-| **Validation** | Zod |
+| Tool | Purpose |
+|---|---|
+| Node.js + Express | Server |
+| MongoDB + Mongoose | Database |
+| Redis | OTP + temp registration storage |
+| bcrypt | Password hashing |
+| JWT | Access tokens |
+| Nodemailer + Gmail OAuth2 | Email delivery |
+| Zod | Validation |
 
 ---
 
 ## 📁 Folder Structure
 
-```bash
-src/
-├── config/              # Configuration files (database, environment)
-├── controllers/         # Request handlers
-├── middleware/          # Express middleware (auth, validation, error handling)
-├── models/              # Data models/schemas
-├── repositories/        # Database access layer
-├── routes/              # API route definitions
-├── services/            # Business logic (auth, email)
-├── utils/               # Utility functions (JWT, hashing, OTP)
-├── validators/          # Zod validation schemas
-└── app.js               # Express app setup
+```
+auth-service/
+├── src/
+│   ├── config/         # DB, Redis config
+│   ├── controllers/    # Request/response handlers
+│   ├── services/       # Business logic
+│   ├── repositories/   # MongoDB queries
+│   ├── routes/         # Express routes
+│   ├── middlewares/    # JWT auth, role guard
+│   ├── http/           # Inter-service HTTP calls
+│   │   └── userService.http.js
+│   └── utils/          # Hash, OTP, JWT helpers
+├── .env
+└── server.js
+```
+
+---
+
+## ⚙️ Environment Variables
+
+```env
+PORT=3000
+MONGO_URI=mongodb://localhost:27017/auth-service-db
+REDIS_URL=redis://localhost:6379
+JWT_SECRET=your_jwt_secret
+JWT_EXPIRES_IN=7d
+INTERNAL_SECRET=your_internal_secret
+USER_SERVICE_URL=http://localhost:3000
+GMAIL_USER=your@gmail.com
+GMAIL_CLIENT_ID=your_client_id
+GMAIL_CLIENT_SECRET=your_client_secret
+GMAIL_REFRESH_TOKEN=your_refresh_token
 ```
 
 ---
 
 ## 🚀 Getting Started
 
-### Prerequisites
-- Node.js v14+
-- MongoDB (local or Atlas)
-- Gmail account for OAuth2 (for email verification)
-
-### Installation
-
-1. **Clone & Install Dependencies**
 ```bash
+# Install dependencies
 npm install
-```
 
-2. **Setup Environment Variables**
-
-Create a `.env` file in the project root:
-
-```env
-# Server
-PORT=3000
-NODE_ENV=development
-
-# Database
-MONGO_URI=mongodb://localhost:27017/auth-service-db
-
-# JWT Configuration
-JWT_SECRET=your_super_secret_jwt_key_change_this_in_production
-JWT_REFRESH_SECRET=your_super_secret_refresh_key_change_this_in_production
-JWT_EXPIRY=15m
-JWT_REFRESH_EXPIRY=7d
-
-# Email Service (Gmail OAuth2)
-GOOGLE_USER=your_email@gmail.com
-GOOGLE_CLIENT_ID=your_google_client_id
-GOOGLE_CLIENT_SECRET=your_google_client_secret
-GOOGLE_REFRESH_TOKEN=your_google_refresh_token
-```
-
-3. **Setup Prisma**
-```bash
-npx prisma migrate dev
-```
-
-4. **Run Development Server**
-```bash
+# Run in development
 npm run dev
-```
 
-Server will start at `http://localhost:3000`
-
----
-
-## 📡 API Routes
-
-### Authentication Endpoints
-
-| Method | Route | Description |
-|--------|-------|-------------|
-| `POST` | `/auth/register` | Register new user |
-| `POST` | `/auth/login` | Login user & create session |
-| `POST` | `/auth/refresh` | Refresh access token |
-| `GET` | `/auth/me` | Get current authenticated user |
-| `GET` | `/auth/sessions` | List active sessions for current user |
-| `POST` | `/auth/logout` | Logout current session |
-
-### Email Verification Endpoints
-
-| Method | Route | Description |
-|--------|-------|-------------|
-| `POST` | `/auth/verify-email` | Verify email with OTP |
-| `POST` | `/auth/request-otp` | Request new verification OTP |
-
-### Password Reset Endpoints
-
-| Method | Route | Description |
-|--------|-------|-------------|
-| `POST` | `/auth/forgot-password` | Send reset OTP to email |
-| `POST` | `/auth/request-reset-password-otp` | Request new reset OTP |
-| `POST` | `/auth/verify-reset-otp` | Verify reset OTP |
-| `POST` | `/auth/reset-password` | Reset password |
-
----
-
-## 🧪 Example Requests
-
-### Register new user
-```bash
-curl -X POST http://localhost:3000/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@gmail.com","password":"StrongPass123","role":"student"}'
-```
-
-### Login
-```bash
-curl -X POST http://localhost:3000/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@gmail.com","password":"StrongPass123"}'
-```
-
-### Refresh access token
-```bash
-curl -X POST http://localhost:3000/auth/refresh \
-  -H "Content-Type: application/json" \
-  -d '{"refreshToken":"YOUR_REFRESH_TOKEN"}'
-```
-
-### Get current user
-```bash
-curl http://localhost:3000/auth/me \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-```
-
-### List active sessions
-```bash
-curl http://localhost:3000/auth/sessions \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-```
-
-### Logout current session
-```bash
-curl -X POST http://localhost:3000/auth/logout \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-```
-
-### Request new verification OTP
-```bash
-curl -X POST http://localhost:3000/auth/request-otp \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@gmail.com"}'
-```
-
-### Verify email with OTP
-```bash
-curl -X POST http://localhost:3000/auth/verify-email \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@gmail.com","otp":"123456"}'
-```
-### Forgot password
-```bash
-curl -X POST http://localhost:3000/auth/forgot-password \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com"}'
-```
-
-### Request reset password OTP
-```bash
-curl -X POST http://localhost:3000/auth/request-reset-password-otp \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com"}'
-```
-
-### Verify reset OTP
-```bash
-curl -X POST http://localhost:3000/auth/verify-reset-otp \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","otp":"123456"}'
-```
-
-### Reset password
-```bash
-curl -X POST http://localhost:3000/auth/reset-password \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"NewStrongPass123"}'
+# Run in production
+npm start
 ```
 
 ---
 
-## 🔄 Authentication Flows
+## 👤 Default Admin Account
 
-### Registration & Email Verification Flow
-```
-Register (email, password)
-        ↓
-   Send OTP Email
-        ↓
-  User Verifies OTP
-        ↓
-   Email Confirmed
-        ↓
-   Account Active
-```
+Admin cannot self-register. It is manually inserted into both databases.
 
-### Login Flow
-```
-Login (email, password)
-        ↓
-Validate Credentials
-        ↓
-Generate Session
-        ↓
-Create JWT Access Token
-        ↓
-Create Refresh Token
-        ↓
-Return Tokens
-```
+| Field | Value |
+|---|---|
+| Email | admin@uet.edu.pk |
+| Password | Admin@123 |
+| Role | ADMIN |
+| University | UET |
 
-### Password Reset Flow
+> ⚠️ Change the password after first login in production.
+
+---
+
+## 📮 API Endpoints
+
+### Public Routes
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/auth/register` | Register new user |
+| POST | `/auth/verify-email` | Verify email OTP |
+| POST | `/auth/request-new-otp` | Resend verification OTP |
+| POST | `/auth/login` | Login |
+| POST | `/auth/forgot-password` | Request password reset OTP |
+| POST | `/auth/verify-reset-otp` | Verify reset OTP |
+| POST | `/auth/reset-password` | Reset password |
+| POST | `/auth/logout` | Logout |
+
+---
+
+## 🔄 Registration Flow
+
 ```
-Forgot Password (email)
-        ↓
-Send Reset OTP
-        ↓
-User Verifies OTP
-        ↓
-Confirm Reset Request
-        ↓
-New Password Set
-        ↓
-Session Invalidated
+1. POST /auth/register
+   → validates email + password
+   → generates userId
+   → stores temp data in Redis (10 mins TTL)
+   → sends OTP to email
+
+2. POST /auth/verify-email
+   → validates OTP from Redis
+   → creates auth record in MongoDB
+   → calls user-service POST /internal/register
+   → user-service creates UserProfile with same userId
+   → cleans up Redis
+   → returns JWT
 ```
 
 ---
 
-## 🔒 Request Validation
+## 🔑 JWT Payload
 
-All request bodies are validated using **Zod** middleware before reaching controllers. Invalid requests return `400 Bad Request` with detailed validation errors.
-
-Example validation error response:
 ```json
 {
-  "status": "error",
-  "message": "Validation failed",
-  "errors": [
-    {
-      "field": "email",
-      "message": "Invalid email format"
-    }
-  ]
+  "userId": "uuid-generated-by-auth-service",
+  "role": "STUDENT | INSTRUCTOR | ADMIN",
+  "university": "UET",
+  "isProfileComplete": false,
+  "iat": 1234567890,
+  "exp": 1234567890
 }
 ```
 
 ---
 
-## 📝 Example Requests
+## 🔒 OTP Rules
 
-### Register User
-```bash
+| Rule | Value |
+|---|---|
+| OTP expiry | 10 minutes |
+| Max wrong attempts | 5 |
+| Resend cooldown | 30 seconds |
+| Max resends | 3 |
+| Block duration | 15 minutes |
+
+---
+
+## 🧪 Postman Test Cases
+
+### 1. Register — Student ✅
+```
 POST /auth/register
-Content-Type: application/json
-
 {
-  "email": "orignal@gmail.com",
-  "password": "SecurePass123!",
-  "role:"student"
+  "name": "Ali Hassan",
+  "email": "ali@gmail.com",
+  "password": "Ali@12345",
+  "role": "STUDENT"
 }
+Expected: 201 — OTP sent to email
 ```
 
-### Login
-```bash
+### 2. Register — Instructor ✅
+```
+POST /auth/register
+{
+  "name": "Dr. Ahmed Raza",
+  "email": "ahmed@gmail.com",
+  "password": "Ahmed@12345",
+  "role": "INSTRUCTOR"
+}
+Expected: 201 — OTP sent to email
+```
+
+### 3. Register — ADMIN blocked ❌
+```
+POST /auth/register
+{
+  "name": "Admin",
+  "email": "admin@uet.edu.pk",
+  "password": "Admin@123",
+  "role": "ADMIN"
+}
+Expected: 400 — Admin accounts cannot be self registered
+```
+
+### 4. Register — Duplicate email ❌
+```
+POST /auth/register
+{ "email": "ali@gmail.com", ... }
+Expected: 409 — Email already exists
+```
+
+### 5. Verify Email — Valid OTP ✅
+```
+POST /auth/verify-email
+{
+  "email": "ali@gmail.com",
+  "otp": "482910"
+}
+Expected: 200 — JWT returned
+```
+
+### 6. Verify Email — Wrong OTP ❌
+```
+POST /auth/verify-email
+{
+  "email": "ali@gmail.com",
+  "otp": "000000"
+}
+Expected: 400 — Invalid OTP
+```
+
+### 7. Verify Email — Expired OTP ❌
+```
+Wait 10 minutes then verify
+Expected: 400 — OTP expired
+```
+
+### 8. Request New OTP ✅
+```
+POST /auth/request-new-otp
+{ "email": "ali@gmail.com" }
+Expected: 200 — New OTP sent
+```
+
+### 9. Request New OTP — Cooldown ❌
+```
+Request twice within 30 seconds
+Expected: 400 — Please wait 30 seconds
+```
+
+### 10. Login — Valid credentials ✅
+```
 POST /auth/login
-Content-Type: application/json
-
 {
-  "email": "orignal@gmail.com",
-  "password": "SecurePass123!",
+  "email": "ali@gmail.com",
+  "password": "Ali@12345"
 }
-
-# Response
-{
-  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
-  "refreshToken": "eyJhbGciOiJIUzI1NiIs...",
-  "user": {
-    "id": "user_id",
-    "email": "user@example.com",
-    "emailVerified": false
-  }
-}
+Expected: 200 — JWT returned
 ```
 
-### Refresh Token
-```bash
-POST /auth/refresh
-Content-Type: application/json
-
+### 11. Login — Wrong password ❌
+```
+POST /auth/login
 {
-  "refreshToken": "eyJhbGciOiJIUzI1NiIs..."
+  "email": "ali@gmail.com",
+  "password": "wrongpassword"
 }
+Expected: 401 — Invalid credentials
+```
 
-# Response
+### 12. Login — Unverified email ❌
+```
+Login before verifying OTP
+Expected: 401 — Please verify your email first
+```
+
+### 13. Forgot Password ✅
+```
+POST /auth/forgot-password
+{ "email": "ali@gmail.com" }
+Expected: 200 — Reset OTP sent
+```
+
+### 14. Verify Reset OTP ✅
+```
+POST /auth/verify-reset-otp
 {
-  "accessToken": "eyJhbGciOiJIUzI1NiIs..."
+  "email": "ali@gmail.com",
+  "otp": "123456"
 }
+Expected: 200 — OTP verified
+```
+
+### 15. Reset Password ✅
+```
+POST /auth/reset-password
+{
+  "email": "ali@gmail.com",
+  "password": "NewPass@123"
+}
+Expected: 200 — Password reset successful
+```
+
+### 16. Logout ✅
+```
+POST /auth/logout
+Authorization: Bearer jwt_token
+Expected: 200 — Logged out successfully
 ```
 
 ---
 
-## 🐛 Troubleshooting
+## 🔗 Inter-Service Communication
 
-| Issue | Solution |
-|-------|----------|
-| `MONGO_URI connection error` | Check MongoDB is running and URI is correct |
-| `OTP email not sending` | Verify Gmail OAuth2 credentials and tokens |
-| `JWT decode errors` | Ensure JWT secrets match between services |
-| `Rate limit exceeded` | Wait before retrying requests |
-| `Session not found` | Login again to create new session |
+Auth service calls user-service after email verification:
 
----
+```
+POST http://localhost:3001/internal/register
+Headers: x-internal-secret: your_internal_secret
+Body: { userId, name, email, role }
+```
 
-## 📦 Dependencies
-
-- `express` - Web framework
-- `mongoose` - MongoDB ODM
-- `prisma` - Modern ORM
-- `jsonwebtoken` - JWT handling
-- `bcryptjs` - Password hashing
-- `nodemailer` - Email service
-- `zod` - Schema validation
-- `dotenv` - Environment variables
+If user-service fails → auth record is rolled back.
 
 ---
 
-## 📄 License
+## 🛡 Security Features
 
-This project is part of the Secure Online Examination System. All rights reserved.
-
----
-
-## 👤 Author
-
-Developed as part of ISL-26 project for Secure Online Examination System.
-
----
-
-## 📞 Support
-
-For issues or questions, please check the main project repository or documentation.
+- Passwords hashed with bcrypt (10 rounds)
+- OTPs hashed before storing in Redis
+- JWT blacklisting on logout
+- Rate limiting on OTP requests
+- Unverified registrations auto-expire (Redis TTL)
+- Admin accounts cannot be self-registered

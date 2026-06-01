@@ -1,9 +1,13 @@
 import { z } from "zod";
 export const registerProfileSchema = z.object({
   userId: z.string().uuid(),
-  name: z.string().min(2).max(100),
+  name: z
+    .string()
+    .min(2, "Name must be at least 2 characters")
+    .max(100, "Name cannot exceed 100 characters"),
   email: z.string().email(),
-  role: z.enum(["STUDENT", "INSTRUCTOR", "ADMIN", ""]),
+  // ADMIN removed to prevent self-registration as admin
+  role: z.enum(["STUDENT", "INSTRUCTOR", ""]),
 });
 export const approvalSchema = z.object({
   status: z.enum(["APPROVED", "REJECTED"]),
@@ -82,3 +86,8 @@ export const completeProfileSchema = z.discriminatedUnion("role", [
     university: z.string().min(2).max(50),
   }),
 ]);
+export const paginationSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(10),
+  search: z.string().optional(),
+});

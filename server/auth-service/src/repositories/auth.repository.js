@@ -31,4 +31,7 @@ export class AuthRepository {
       }
     );
   }
+  async deleteByEmail(email) {
+    return AuthIdentity.findOneAndDelete({ email });  
+  }   
 }

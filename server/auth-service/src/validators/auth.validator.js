@@ -1,6 +1,7 @@
 import { z } from "zod";
 // REGISTER
 export const registerSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters").max(100, "Name cannot exceed 100 characters"),
   email: z.string().email("Invalid email format"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   role: z
@@ -8,8 +9,9 @@ export const registerSchema = z.object({
     // CONVERT TO LOWERCASE
     .transform((value) => value.toLowerCase())
     // VALIDATE ROLE
-    .refine((value) => ["admin", "instructor", "student"].includes(value), {
-      message: "Role must be admin, instructor, or student",
+    // Disallow self-registration as admin; only instructor and student allowed
+    .refine((value) => ["instructor", "student"].includes(value), {
+      message: "Role must be instructor or student",
     }),
 });
 // LOGIN

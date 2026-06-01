@@ -12,12 +12,17 @@ import {
   generateRefreshToken,
   verifyRefreshToken,
 } from "../utils/jwt.js";
+import userServiceHttp from "../http/userService.http.js";
 const authRepo = new AuthRepository();
 const sessionRepo = new SessionRepository();
 const emailService = new EmailService();
 const verificationRepo = new VerificationRepository();
 export class AuthService {
   async register(body) {
+    // Prevent users from self-registering as admin
+    if (String(body.role).toLowerCase() === "admin") {
+      throw new Error("CANNOT_SELF_REGISTER_AS_ADMIN");
+    }
     // 1. check MongoDB — permanent record
     const existing = await authRepo.findByEmail(body.email);
     if (existing) {
@@ -38,7 +43,7 @@ export class AuthService {
     // 4. store temp registration data in Redis
     await verificationRepo.storeTempRegistration(userId, {
       userId,
-      // name: body.name,
+      name: body.name,
       email: body.email,
       role: body.role,
       passwordHash,
@@ -145,6 +150,13 @@ export class AuthService {
     if (!tempData) {
       throw new Error("Registration session expired. Please register again.");
     }
+    // Extra guard: prevent admin from being created via temp data
+    if (String(tempData.role).toLowerCase() === "admin") {
+      // cleanup temp entries
+      await verificationRepo.deleteOTP("EMAIL_VERIFICATION", body.email);
+      await verificationRepo.deleteTempRegistration(tempData.userId);
+      throw new Error("CANNOT_SELF_REGISTER_AS_ADMIN");
+    }
     // 8. create auth record in MongoDB
     await authRepo.create({
       userId: tempData.userId,
@@ -153,6 +165,18 @@ export class AuthService {
       role: tempData.role,
       isEmailVerified: true,
     });
+    try {
+      await userServiceHttp.createProfile({
+        userId: tempData.userId,
+        name: tempData.name,
+        email: tempData.email,
+        role: tempData.role,
+      });
+    } catch (error) {
+      // user-service failed → rollback auth record
+      await authRepo.deleteByEmail(tempData.email);
+      throw new Error("Registration failed. Please try again.");
+    }
     // 10. mark OTP used
     await verificationRepo.updateOTP("EMAIL_VERIFICATION", body.email, {
       used: true,
@@ -184,7 +208,7 @@ export class AuthService {
   async getSessions(userId) {
     return sessionRepo.getUserSessions(userId);
   }
-  
+
   //   if (!refreshToken) {
   //     throw new Error("Refresh token is required");
   //   }
