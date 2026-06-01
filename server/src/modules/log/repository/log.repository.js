@@ -1,0 +1,261 @@
+// Repository layer - all MongoDB operations for logs (data abstraction)
+
+const Log = require('../model/log.model');
+const logger = require('../utils/logger');
+const config = require('../config/config');
+
+class LogRepository {
+  async create(logData) {
+    try {
+      const log = new Log(logData);
+      const saved = await log.save();
+      logger.debug('Log created', { id: saved._id });
+      return saved;
+    } catch (error) {
+      logger.error('Failed to create log', error);
+      throw error;
+    }
+  }
+
+  async findById(logId) {
+    try {
+      const log = await Log.findById(logId);
+      return log;
+    } catch (error) {
+      logger.error('Failed to find log by ID', error);
+      throw error;
+    }
+  }
+
+  async findByRequestId(requestId, options = {}) {
+    try {
+      const { limit = 10, skip = 0, sort = { timestamp: -1 } } = options;
+      const logs = await Log.find({ requestId })
+        .sort(sort)
+        .limit(limit)
+        .skip(skip)
+        .lean();
+      const total = await Log.countDocuments({ requestId });
+      return { data: logs, total };
+    } catch (error) {
+      logger.error('Failed to find logs by requestId', error);
+      throw error;
+    }
+  }
+
+  async findByService(service, options = {}) {
+    try {
+      const {
+        eventType = null,
+        limit = config.QUERY_LIMITS.DEFAULT_LIMIT,
+        skip = 0,
+        startTime = null,
+        endTime = null,
+        sort = { timestamp: -1 }
+      } = options;
+
+      const query = { service };
+      if (eventType) query.eventType = eventType;
+      if (startTime || endTime) {
+        query.timestamp = {};
+        if (startTime) query.timestamp.$gte = new Date(startTime);
+        if (endTime) query.timestamp.$lte = new Date(endTime);
+      }
+
+      const logs = await Log.find(query)
+        .sort(sort)
+        .limit(limit)
+        .skip(skip)
+        .lean();
+      const total = await Log.countDocuments(query);
+      return { data: logs, total };
+    } catch (error) {
+      logger.error('Failed to find logs by service', error);
+      throw error;
+    }
+  }
+
+  async findByUserId(userId, options = {}) {
+    try {
+      const {
+        limit = config.QUERY_LIMITS.DEFAULT_LIMIT,
+        skip = 0,
+        sort = { timestamp: -1 }
+      } = options;
+
+      const logs = await Log.find({ 'request.userId': userId })
+        .sort(sort)
+        .limit(limit)
+        .skip(skip)
+        .lean();
+      const total = await Log.countDocuments({ 'request.userId': userId });
+      return { data: logs, total };
+    } catch (error) {
+      logger.error('Failed to find logs by userId', error);
+      throw error;
+    }
+  }
+
+  async findByDateRange(startTime, endTime, options = {}) {
+    try {
+      const {
+        service = null,
+        eventType = null,
+        limit = config.QUERY_LIMITS.DEFAULT_LIMIT,
+        skip = 0,
+        sort = { timestamp: -1 }
+      } = options;
+
+      const query = {
+        timestamp: {
+          $gte: new Date(startTime),
+          $lte: new Date(endTime)
+        }
+      };
+
+      if (service) query.service = service;
+      if (eventType) query.eventType = eventType;
+
+      const logs = await Log.find(query)
+        .sort(sort)
+        .limit(limit)
+        .skip(skip)
+        .lean();
+      const total = await Log.countDocuments(query);
+      return { data: logs, total };
+    } catch (error) {
+      logger.error('Failed to find logs by date range', error);
+      throw error;
+    }
+  }
+
+  async findByStatusCode(statusCode, options = {}) {
+    try {
+      const {
+        service = null,
+        limit = config.QUERY_LIMITS.DEFAULT_LIMIT,
+        skip = 0,
+        sort = { timestamp: -1 }
+      } = options;
+
+      const query = { 'response.statusCode': statusCode };
+      if (service) query.service = service;
+
+      const logs = await Log.find(query)
+        .sort(sort)
+        .limit(limit)
+        .skip(skip)
+        .lean();
+      const total = await Log.countDocuments(query);
+      return { data: logs, total };
+    } catch (error) {
+      logger.error('Failed to find logs by status code', error);
+      throw error;
+    }
+  }
+
+  async findErrorLogs(options = {}) {
+    try {
+      const {
+        service = null,
+        limit = config.QUERY_LIMITS.DEFAULT_LIMIT,
+        skip = 0,
+        sort = { timestamp: -1 }
+      } = options;
+
+      const query = {
+        $or: [
+          { 'response.statusCode': { $gte: 400 } },
+          { error: { $ne: null } }
+        ]
+      };
+
+      if (service) query.service = service;
+
+      const logs = await Log.find(query)
+        .sort(sort)
+        .limit(limit)
+        .skip(skip)
+        .lean();
+      const total = await Log.countDocuments(query);
+      return { data: logs, total };
+    } catch (error) {
+      logger.error('Failed to find error logs', error);
+      throw error;
+    }
+  }
+
+  async getLastLog(service, environment = null) {
+    try {
+      const query = { service };
+      if (environment) query.environment = environment;
+
+      const log = await Log.findOne(query)
+        .sort({ timestamp: -1 })
+        .lean();
+      return log;
+    } catch (error) {
+      logger.error('Failed to get last log', error);
+      throw error;
+    }
+  }
+
+//   async deleteOlderThan(days) {
+//     try {
+//       const cutoffDate = new Date();
+//       cutoffDate.setDate(cutoffDate.getDate() - days);
+
+//       const result = await Log.deleteMany({ timestamp: { $lt: cutoffDate } });
+//       logger.info(`Deleted ${result.deletedCount} logs older than ${days} days`);
+//       return result;
+//     } catch (error) {
+//       logger.error('Failed to delete old logs', error);
+//       throw error;
+//     }
+//   }
+
+  async getStats(service, options = {}) {
+    try {
+      const { startTime = null, endTime = null } = options;
+      const query = { service };
+
+      if (startTime || endTime) {
+        query.timestamp = {};
+        if (startTime) query.timestamp.$gte = new Date(startTime);
+        if (endTime) query.timestamp.$lte = new Date(endTime);
+      }
+
+      const stats = await Log.aggregate([
+        { $match: query },
+        {
+          $facet: {
+            totalCount: [{ $count: 'count' }],
+            requestCount: [
+              { $match: { eventType: 'REQUEST' } },
+              { $count: 'count' }
+            ],
+            responseCount: [
+              { $match: { eventType: 'RESPONSE' } },
+              { $count: 'count' }
+            ],
+            errorCount: [
+              { $match: { 'response.statusCode': { $gte: 400 } } },
+              { $count: 'count' }
+            ],
+            avgResponseTime: [
+              { $match: { eventType: 'RESPONSE' } },
+              { $group: { _id: null, avg: { $avg: '$response.responseTime' } } }
+            ]
+          }
+        }
+      ]);
+
+      return stats[0];
+    } catch (error) {
+      logger.error('Failed to get stats', error);
+      throw error;
+    }
+  }
+}
+
+module.exports = new LogRepository();

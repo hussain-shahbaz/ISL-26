@@ -1,0 +1,15 @@
+server/src/modules/.env
+server/src/modules/db.js
+server/src/modules/package-lock.json
+server/src/modules/server.js
+server/src/modules/app.js
+server/src/modules/node_modules*/*node_modules*/*
+*.log
+*.env
+*.DS_Store
+*/node_modules/*
+node_modules/
+server/src/modules/package-lock.json
+server/src/modules/node_modules
+.env
+node_modules

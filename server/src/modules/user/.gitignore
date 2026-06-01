@@ -1,0 +1,28 @@
+# Ignore all node_modules folders
+**/node_modules/
+
+# Ignore all .env files
+**/.env
+**/.env.*
+
+# Existing entries
+/dist
+/coverage
+/prisma/migrations
+/prisma/dev.db
+/prisma/dev.db-journal
+/prisma/dev.db-shm
+/prisma/dev.db-wal
+/prisma/dev.db.backup
+/prisma/dev.db.backup-journal
+/prisma/dev.db.backup-shm
+/prisma/dev.db.backup-wal
+/prisma/dev.db.backup2
+/prisma/dev.db.backup2-journal
+/prisma/dev.db.backup2-shm
+/prisma/dev.db.backup2-wal
+/generated/prisma
+/db.js
+/index.js
+/package-lock.json
+/package.json
