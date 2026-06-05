@@ -1,7 +1,13 @@
-"""Text grading: Gemini first (google-genai), Groq fallback (OpenAI-compatible)."""
+"""Text grading: Gemini first (google-genai), Groq fallback (OpenAI-compatible).
+
+Groq base URL: https://api.groq.com/openai/v1  (NOT api.x.ai — that is xAI/Grok)
+Free-tier limits (2026): 30 RPM / 6 000 TPM / 1 000 RPD per model.
+Recommended free models: llama-3.3-70b-versatile, llama3-8b-8192, gemma2-9b-it
+"""
 
 import json
 import logging
+import time
 from typing import Any, Dict, Optional
 
 import requests
@@ -10,12 +16,39 @@ from google.genai import types
 from pydantic import BaseModel, field_validator
 
 from app.config import Config
-from app.gemini_keys import QuotaExhaustedError, run_with_retry
+from app.utils.gemini_keys import QuotaExhaustedError, run_with_retry
 from app.services.grading.rate_limiter import call_with_limit, retry_with_backoff
 
 logger = logging.getLogger(__name__)
 
 __all__ = ["GeminiGradingService", "GroqGradingService"]
+
+# ── Correct Groq endpoint ────────────────────────────────────────────────────
+# Config.GROQ_BASE_URL must be "https://api.groq.com/openai/v1"
+# If it is still pointing at api.x.ai, override it here as a safety net.
+_GROQ_BASE_URL_FALLBACK = "https://api.groq.com/openai/v1"
+
+
+def _groq_base_url() -> str:
+    """Return the correct Groq base URL, fixing the common mis-config."""
+    url = getattr(Config, "GROQ_BASE_URL", _GROQ_BASE_URL_FALLBACK) or _GROQ_BASE_URL_FALLBACK
+    if "x.ai" in url or not url.startswith("https://api.groq.com"):
+        logger.warning(
+            "GROQ_BASE_URL is '%s' which looks wrong — using %s instead. "
+            "Fix Config.GROQ_BASE_URL = 'https://api.groq.com/openai/v1'",
+            url,
+            _GROQ_BASE_URL_FALLBACK,
+        )
+        return _GROQ_BASE_URL_FALLBACK
+    return url.rstrip("/")
+
+
+# ── Recommended free-tier models (most capable → lightest) ──────────────────
+_GROQ_MODEL_FALLBACK_CHAIN = [
+    "llama-3.3-70b-versatile",   # Best quality; 30 RPM / 6 K TPM / 1 K RPD
+    "llama3-8b-8192",            # Fastest; same RPM, lowest latency
+    "gemma2-9b-it",              # Highest TPM (15 K) if token budget is an issue
+]
 
 
 class GradingOutput(BaseModel):
@@ -93,8 +126,61 @@ def _format_result(result: GradingOutput, marks: int) -> Dict[str, Any]:
     }
 
 
+def _is_connection_error(exc: Exception) -> bool:
+    """True for network/DNS errors that are worth retrying after a short wait."""
+    msg = str(exc).lower()
+    return any(k in msg for k in ("connectionerror", "nameresolution", "timeout", "connect"))
+
+
+def _is_rate_limit_error(exc: Exception) -> bool:
+    """True for HTTP 429 / quota errors."""
+    msg = str(exc).lower()
+    return any(k in msg for k in ("429", "rate limit", "quota", "too many requests"))
+
+
 class GroqGradingService:
-    """Grade via Groq API (free/cheap OpenAI-compatible endpoint)."""
+    """Grade via Groq API (free, OpenAI-compatible).
+
+    Endpoint: https://api.groq.com/openai/v1/chat/completions
+    Free tier: 30 RPM / 6 000 TPM / 1 000 RPD (no credit card needed).
+    Falls back through _GROQ_MODEL_FALLBACK_CHAIN on quota errors.
+    """
+
+    # How long to wait (seconds) before retrying a rate-limited request
+    _RATE_LIMIT_WAIT = 62   # just over 1 minute resets the RPM window
+    _CONN_ERROR_WAIT = 5    # brief pause before retrying a connection error
+    _MAX_RETRIES = 4
+
+    def _post(self, model: str, system: str, user: str) -> GradingOutput:
+        """Single HTTP call to Groq."""
+        base = _groq_base_url()
+        url = f"{base}/chat/completions"
+        timeout = getattr(Config, "GROQ_TIMEOUT", 30)
+
+        resp = requests.post(
+            url,
+            headers={
+                "Authorization": f"Bearer {Config.GROQ_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                "temperature": 0.3,
+            },
+            timeout=timeout,
+        )
+
+        # Surface HTTP errors as exceptions with the status code in the message
+        if not resp.ok:
+            raise requests.HTTPError(
+                f"HTTP {resp.status_code}: {resp.text[:300]}", response=resp
+            )
+
+        return _parse_grading_json(resp.json()["choices"][0]["message"]["content"])
 
     def grade_answer(
         self,
@@ -114,44 +200,68 @@ class GroqGradingService:
         system = _system_prompt(mode, additional_instructions)
         user = _user_prompt(question_text, reference_answer, submitted_answer, marks)
 
-        def _call():
-            # Groq uses OpenAI-compatible /chat/completions endpoint
-            url = f"{Config.GROQ_BASE_URL}/chat/completions"
-            resp = requests.post(
-                url,
-                headers={
-                    "Authorization": f"Bearer {Config.GROQ_API_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": Config.GROQ_MODEL,
-                    "messages": [
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": user},
-                    ],
-                    "temperature": 0.3,
-                },
-                timeout=Config.GROQ_TIMEOUT,
-            )
-            resp.raise_for_status()
-            return _parse_grading_json(resp.json()["choices"][0]["message"]["content"])
+        # Decide which model to try first
+        configured_model = getattr(Config, "GROQ_MODEL", None) or _GROQ_MODEL_FALLBACK_CHAIN[0]
+        # Build ordered chain: configured model first, then the rest
+        chain = [configured_model] + [m for m in _GROQ_MODEL_FALLBACK_CHAIN if m != configured_model]
 
-        try:
-            result = retry_with_backoff(
-                _call,
-                label="groq",
-                max_retries=3,
-                wait_seconds=10,
-            )
-            logger.info("Graded via Groq")
-            return _format_result(result, marks)
-        except Exception as exc:
-            logger.exception("Groq grading failed: %s", exc)
-            return {"success": False, "error": str(exc)}
+        last_exc: Optional[Exception] = None
+
+        for model in chain:
+            for attempt in range(1, self._MAX_RETRIES + 1):
+                try:
+                    result = call_with_limit(lambda m=model: self._post(m, system, user))
+                    logger.info("Graded via Groq (%s)", model)
+                    return _format_result(result, marks)
+
+                except requests.exceptions.ConnectionError as exc:
+                    # DNS / network failure — retry quickly, not a quota issue
+                    last_exc = exc
+                    logger.warning(
+                        "[groq/%s] Connection error (attempt %d/%d): %s",
+                        model, attempt, self._MAX_RETRIES, str(exc)[:120],
+                    )
+                    if attempt < self._MAX_RETRIES:
+                        time.sleep(self._CONN_ERROR_WAIT * attempt)
+                        continue
+                    break  # give up on this model, try next
+
+                except requests.exceptions.Timeout as exc:
+                    last_exc = exc
+                    logger.warning("[groq/%s] Timeout (attempt %d/%d)", model, attempt, self._MAX_RETRIES)
+                    if attempt < self._MAX_RETRIES:
+                        time.sleep(self._CONN_ERROR_WAIT)
+                        continue
+                    break
+
+                except requests.HTTPError as exc:
+                    last_exc = exc
+                    if _is_rate_limit_error(exc):
+                        logger.warning(
+                            "[groq/%s] Rate limited (attempt %d/%d) — waiting %ds",
+                            model, attempt, self._MAX_RETRIES, self._RATE_LIMIT_WAIT,
+                        )
+                        if attempt < self._MAX_RETRIES:
+                            time.sleep(self._RATE_LIMIT_WAIT)
+                            continue
+                    # Non-429 HTTP error or exhausted retries → try next model
+                    logger.warning("[groq/%s] HTTP error: %s", model, str(exc)[:120])
+                    break
+
+                except Exception as exc:
+                    last_exc = exc
+                    logger.warning("[groq/%s] Unexpected error: %s", model, str(exc)[:120])
+                    break
+
+        logger.error("All Groq models/retries exhausted. Last error: %s", last_exc)
+        return {"success": False, "error": f"Groq grading failed: {last_exc}"}
 
 
 class GeminiGradingService:
-    """Grade via Gemini API; falls back to Groq on quota/errors."""
+    """Grade via Gemini API; falls back to Groq on quota/errors.
+
+    Uses gemini-1.5-flash (free tier: 15 RPM / 1 500 RPD on AI Studio keys).
+    """
 
     def __init__(self):
         self._groq = GroqGradingService()
@@ -163,7 +273,7 @@ class GeminiGradingService:
         def _invoke():
             client = genai.Client(api_key=api_key)
             response = client.models.generate_content(
-                model=Config.GEMINI_MODEL,
+                model=Config.GEMINI_MODEL,  # e.g. "gemini-1.5-flash"
                 contents=user,
                 config=types.GenerateContentConfig(
                     system_instruction=system,
@@ -199,9 +309,9 @@ class GeminiGradingService:
                 logger.info("Graded via Gemini")
                 return _format_result(result, marks)
             except QuotaExhaustedError:
-                logger.warning("Gemini quota exhausted — using Groq")
+                logger.warning("Gemini quota exhausted — falling back to Groq")
             except Exception as exc:
-                logger.warning("Gemini failed: %s — using Groq", str(exc)[:100])
+                logger.warning("Gemini failed: %s — falling back to Groq", str(exc)[:100])
 
         # Fall back to Groq
         logger.info("Falling back to Groq")

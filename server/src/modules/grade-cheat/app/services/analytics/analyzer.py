@@ -5,7 +5,7 @@ from collections import defaultdict
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from app.data_provider import DataProvider
+from app.utils.data_provider import DataProvider
 from app.models import ExamAnalysisRepository, ExamResultRepository
 
 logger = logging.getLogger(__name__)

@@ -7,14 +7,14 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-FIXTURE_PATH = Path(__file__).resolve().parent / "data" / "exams.json"
+FIXTURE_PATH = "C:\\Users\\User\\Documents\\STUDY\\Sem4\\ISL\\Project\\ISL-26\\server\\src\\modules\\grade-cheat\\app\\data\\exams.json"
 
 
 def _load_fixture() -> Dict[str, Any]:
-    if not FIXTURE_PATH.is_file():
-        raise FileNotFoundError(f"Exam fixture not found: {FIXTURE_PATH}")
-    with FIXTURE_PATH.open(encoding="utf-8") as f:
-        return json.load(f)
+    # if not FIXTURE_PATH.is_file():
+    #     raise FileNotFoundError(f"Exam fixture not found: {FIXTURE_PATH}")
+    # with FIXTURE_PATH.open(encoding="utf-8") as f:
+    return json.load(open(FIXTURE_PATH, encoding="utf-8"))
 
 
 class DataProvider:

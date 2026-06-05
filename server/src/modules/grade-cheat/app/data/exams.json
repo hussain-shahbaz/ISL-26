@@ -1,8 +1,8 @@
 {
   "questions": {
-    "exam_002": [
+    "exam_001": [
       {
-        "examId": "exam_002",
+        "examId": "exam_001",
         "questionId": "q1",
         "type": "text",
         "topic": "photosynthesis",
@@ -11,7 +11,7 @@
         "referenceAnswer": "Photosynthesis is the process by which plants convert light energy (from the sun) into chemical energy stored in glucose. Plants use sunlight, water, and carbon dioxide to produce glucose and oxygen. This glucose is used as an energy source for growth and metabolism."
       },
       {
-        "examId": "exam_002",
+        "examId": "exam_001",
         "questionId": "q2",
         "type": "text",
         "topic": "water cycle",
@@ -20,7 +20,7 @@
         "referenceAnswer": "Water evaporates from oceans and lakes due to heat from the sun. The water vapor rises into the atmosphere and condenses to form clouds. Finally, the water falls back to earth as precipitation, completing the cycle."
       },
       {
-        "examId": "exam_002",
+        "examId": "exam_001",
         "questionId": "q3",
         "type": "mcq",
         "topic": "chemistry - salt formula",
@@ -30,7 +30,7 @@
         "referenceAnswer": "NaCl"
       },
       {
-        "examId": "exam_002",
+        "examId": "exam_001",
         "questionId": "q4",
         "type": "text",
         "topic": "states of matter",
@@ -39,7 +39,7 @@
         "referenceAnswer": "The three states of matter are solid, liquid, and gas. Solids have fixed shape and volume. Liquids have fixed volume but take the shape of their container. Gases have neither fixed shape nor volume."
       },
       {
-        "examId": "exam_002",
+        "examId": "exam_001",
         "questionId": "q5",
         "type": "text",
         "topic": "DNA and genetics",
@@ -50,9 +50,9 @@
     ]
   },
   "submissions": {
-    "exam_002": [
+    "exam_001": [
       {
-        "examId": "exam_002",
+        "examId": "exam_001",
         "studentId": "student_001",
         "answers": [
           {
@@ -88,7 +88,7 @@
         ]
       },
       {
-        "examId": "exam_002",
+        "examId": "exam_001",
         "studentId": "student_002",
         "answers": [
           {
@@ -124,7 +124,7 @@
         ]
       },
       {
-        "examId": "exam_002",
+        "examId": "exam_001",
         "studentId": "student_003",
         "answers": [
           {

@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 from app.celery_app import celery_app
-from app.data_provider import DataProvider
+from app.utils.data_provider import DataProvider
 from app.models import ExamResultRepository
 from app.services import (
     ExamAnalysisService,

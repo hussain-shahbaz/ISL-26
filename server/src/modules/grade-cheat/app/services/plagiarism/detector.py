@@ -6,7 +6,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 from app.config import Config
-from app.semantic_index import index_exam_answers, query_similar_peers
+from app.utils.semantic_index import index_exam_answers, query_similar_peers
 
 logger = logging.getLogger(__name__)
 
