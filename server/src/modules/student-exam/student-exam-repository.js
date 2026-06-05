@@ -9,5 +9,8 @@ class StudentExamRepository {
     async findByExamIdAndStudentId(examId, studentId) {
         return await studentExam.findOne({ examId, studentId });
     }
+    async findAllByExamId(examId) {
+        return await studentExam.find({ examId });
+    }
 }
 module.exports = new StudentExamRepository();

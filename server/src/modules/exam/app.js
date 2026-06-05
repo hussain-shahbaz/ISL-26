@@ -7,7 +7,7 @@ class App {
     this.app = express();
     this.app.use(express.json());
     this.app.use((req, res, next) => {
-      req.user = { userId: '101', role: 'teacher' };
+      req.user = { userId: '101', role: 'student' };
       next();
     });
     this.app.use('/health', (req, res) => res.status(200).json({ status: 'success', message: 'Exam module is healthy' }));

@@ -13,14 +13,13 @@ import unittest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from app.plagiarism import (
+from app.services import (
     build_peer_index,
     check_plagiarism,
     compute_tfidf_similarity,
-    is_semantic_index_ready,
-    prepare_plagiarism_index,
+    grade_mcq,
 )
-from app.grader import grade_mcq
+from app.services.plagiarism import is_semantic_index_ready
 from app.data_provider import DataProvider
 
 

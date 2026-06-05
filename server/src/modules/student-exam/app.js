@@ -9,8 +9,8 @@ class App {
     }
 
     start() {
-        this.app.listen(process.env.PORT, () => {
-                console.log(`Student Exam Service is running on port ${process.env.PORT}`);     
+        this.app.listen(process.env.PORT || 3005, () => {
+                console.log(`Student Exam Service is running on port ${process.env.PORT || 3005}`);     
             }
         )
     }

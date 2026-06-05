@@ -37,6 +37,11 @@ class Config:
     DEBUG = FLASK_ENV == "development"
     TESTING = False
 
+    #Microservices URLS
+    SERVICE_SECRET = os.getenv("SERVICE_SECRET","")
+    SUBMISSION_BASE_URL = os.getenv("SUBMISSION_BASE_URL", "http://localhost:3005/api/v1/student-exam")
+    EXAM_BASE_URL = os.getenv("EXAM_BASE_URL", "http://localhost:3006/api/v1/exam")
+
     # Gemini — comma-separated keys rotate on quota errors
     GEMINI_API_KEYS = _GEMINI_KEYS
     GEMINI_API_KEY = _GEMINI_KEYS[0] if _GEMINI_KEYS else ""
@@ -45,13 +50,16 @@ class Config:
     EMBEDDING_DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS", "768"))
     GEMINI_RETRY_WAIT_SECONDS = int(os.getenv("GEMINI_RETRY_WAIT_SECONDS", "60"))
     GEMINI_MAX_RETRIES = int(os.getenv("GEMINI_MAX_RETRIES", "10"))
-    GEMINI_RATE_LIMIT_RPM = int(os.getenv("GEMINI_RATE_LIMIT_RPM", "5"))
+    # Rate limit: 15 RPM for Gemini (1 request per 4 seconds with multiple keys)
+    GEMINI_RATE_LIMIT_RPM = int(os.getenv("GEMINI_RATE_LIMIT_RPM", "15"))
 
-    # Grok (xAI) — fallback when Gemini fails
-    GROK_API_KEY = os.getenv("GROK_API_KEY", "").strip()
-    GROK_MODEL = os.getenv("GROK_MODEL", "grok-4-1-fast-reasoning")
-    GROK_BASE_URL = os.getenv("GROK_BASE_URL", "https://api.x.ai/v1")
-    GROK_TIMEOUT = int(os.getenv("GROK_TIMEOUT", "360"))
+    # Groq (fast LLM) — free and cheap models for efficient grading
+    GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
+    GROQ_MODEL = os.getenv("GROQ_MODEL", "mixtral-8x7b-32768")  # Free tier
+    GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
+    GROQ_TIMEOUT = int(os.getenv("GROQ_TIMEOUT", "60"))
+    # Groq rate limit: 30 RPM (faster, cheaper than Gemini)
+    GROQ_RATE_LIMIT_RPM = int(os.getenv("GROQ_RATE_LIMIT_RPM", "30"))
 
     # MongoDB
     MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")

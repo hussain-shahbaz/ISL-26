@@ -5,13 +5,16 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 from app.celery_app import celery_app
-from app.data_provider import DataProvider
-from app.grader import grade_question
+from app.utils.data_provider import DataProvider
 from app.models import ExamResultRepository
-from app.plagiarism import check_plagiarism, prepare_plagiarism_index
-from app.services.analysis_service import ExamAnalysisService
-from app.services.gemini_service import GeminiGradingService
-from app.services.task_tracker import TaskTracker
+from app.services import (
+    ExamAnalysisService,
+    GeminiGradingService,
+    TaskTracker,
+    check_plagiarism,
+    grade_question,
+    prepare_plagiarism_index,
+)
 
 logger = logging.getLogger(__name__)
 
