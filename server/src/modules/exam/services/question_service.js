@@ -1,5 +1,6 @@
 const examRepository = require('../repository/exam_repository');
 const questionRepository = require('../repository/question_repository');
+const ROLES = require('../config/roles');
 
 class QuestionService {
 
@@ -20,11 +21,11 @@ class QuestionService {
     return result;
   }
 
-  async getQuestionsByExam(examId, user) {
+  async getWholeExamByExamId(examId, user) {
     const exam = await examRepository.findById(examId);
     if (!exam) throw new Error('Exam not found');
 
-    if (user.role === 'student') {
+    if (user.role === ROLES.STUDENT) {
       if (exam.status !== 'published') {
         throw new Error('Exam is not available');
       }
@@ -34,21 +35,40 @@ class QuestionService {
       if (!exam.students.includes(user.rollNumber)) {
         throw new Error('You are not allowed in this exam');
       }
-    }else if(user.role === "teacher"){
+    }else if(user.role === ROLES.TEACHER){
       if(user.userId !== exam.instructorId){
         throw new Error("Not authorized")
       }
     }
     const questions = await questionRepository.findByExamId(examId);
     // student ko referenceAnswer nahi dikhna
-    if (user.role === 'student') {
-      return questions.map(q => {
-        const { referenceAnswer, ...safe } = q.toObject();
-        return safe;
-      });
+     if (user.role === ROLES.STUDENT) {
+      return {
+        exam: {
+          _id:           exam._id,
+          title:         exam.title,
+          subject:       exam.subject,
+          teacherName:   exam.teacherName,
+          scheduledTime: exam.scheduledTime,
+          timeAllowed:   exam.timeAllowed,
+          totalMarks:    exam.totalMarks,
+          status:        exam.status
+        },
+        questions: questions.map(q => {
+          const { referenceAnswer, ...safe } = q.toObject();
+          return safe;
+        })
+      };
     }
-
-    return questions;
+    else if(user.role === ROLES.TEACHER){
+      return {
+        exam:      exam,
+        questions: questions
+      };
+    }
+    else{
+      throw new Error("Only teacher or students can access this")
+    }
   }
 
   async getQuestionById(id) {

@@ -1,11 +1,12 @@
 const examService   = require('../services/exam_service');
 const examValidator = require('../validators/exam_validator');
+const ROLES = require('../config/roles');
 
 class ExamController {
 
   async createExam(req, res) {
 
-    if (req.user.role !== 'teacher') {
+    if (req.user.role !== ROLES.TEACHER) {
       return res.status(403).json({ status: 'error', message: 'Only teachers can create exams' });
     }
 
