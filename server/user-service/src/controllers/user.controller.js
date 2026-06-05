@@ -292,9 +292,11 @@ class UserController {
       }
 
       const { page, limit, search } = parsed.data;
+      const adminId = req.user?.userId || req.user?.id || req.user?.sub;
+      const adminProfile = await userService.getProfile(adminId);
 
       const { users, total } = await userService.getStudents({
-        university: req.user.university,
+        university: adminProfile.university,
         page,
         limit,
         search,
@@ -363,9 +365,11 @@ class UserController {
       }
 
       const { page, limit } = parsed.data;
+      const adminId = req.user?.userId || req.user?.id || req.user?.sub;
+      const adminProfile = await userService.getProfile(adminId);
 
       const { users, total } = await userService.getPendingUsers({
-        university: req.user.university,
+        university: adminProfile.university,
         page,
         limit,
       });
