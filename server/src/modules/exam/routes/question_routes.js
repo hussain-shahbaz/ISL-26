@@ -1,6 +1,7 @@
 const express            = require('express');
 const questionController = require('../controllers/question_controller');
 const questionAuthMiddleware = require('../middleware/question_auth_middleware');
+const serviceAuth = require('../middleware/service_auth_middleware');
 
 class QuestionRoutes {
   constructor() {
@@ -8,11 +9,9 @@ class QuestionRoutes {
     this._bindRoutes();
   }
 
-  _bindRoutes() {
-    const questionAuthMiddleware = require('../middleware/question_auth_middleware');
-  }
-
 _bindRoutes() {
+  this.router.use(serviceAuth.verify.bind(serviceAuth));
+
   this.router.post('/:examId',              questionAuthMiddleware.verifyQuestionOwner.bind(questionAuthMiddleware), (req, res) => questionController.createQuestion(req, res));
   this.router.get('/:examId',      (req, res) => questionController.getWholeExamByExamId(req, res));
   // this.router.get('/detail/:id',         questionAuthMiddleware.verifyQuestionOwner.bind(questionAuthMiddleware), (req, res) => questionController.getQuestionById(req, res));

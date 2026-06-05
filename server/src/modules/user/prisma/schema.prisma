@@ -1,0 +1,38 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                 String           @id @default(uuid())
+  name               String           @db.VarChar(100)
+  email              String           @unique @db.VarChar(100)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  role               Role             @default(STUDENT)
+  university         String           @db.VarChar(50) @default("UET")
+  identifier         UserIdentifier? 
+  isDeleted          Boolean          @default(false)
+  @@index([email])
+}
+
+model UserIdentifier {
+  id            String @id @default(uuid())
+  identifier    String @unique @db.VarChar(50)
+  department    String  @db.VarChar(100)        
+  degreeProgram String? @db.VarChar(100)        
+  
+  batch         Int?
+  userId        String @unique
+  user          User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([identifier])
+}
+
+enum Role {
+  ADMIN
+  STUDENT
+  INSTRUCTOR
+}

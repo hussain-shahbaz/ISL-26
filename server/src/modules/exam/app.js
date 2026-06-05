@@ -1,6 +1,6 @@
 const express        = require('express');
-const examRoutes     = require('./exam/routes/exam_routes');
-const questionRoutes = require('./exam/routes/question_routes');
+const examRoutes     = require('./routes/exam_routes');
+const questionRoutes = require('./routes/question_routes');
 
 class App {
   constructor() {
@@ -10,13 +10,14 @@ class App {
       req.user = { userId: '101', role: 'student' };
       next();
     });
+    this.app.use('/health', (req, res) => res.status(200).json({ status: 'success', message: 'Exam module is healthy' }));
     this.app.use('/api/exam', examRoutes.getRouter());
     this.app.use('/api/exam/question', questionRoutes.getRouter());
   }
 
   start() {
-    this.app.listen(process.env.PORT, () => {
-      console.log('Server chal raha hai port 3000 pe');
+    this.app.listen(process.env.PORT || 3002, () => {
+      console.log(`Server chal raha hai port ${process.env.PORT || 3002} pe`);
     });
   }
 }

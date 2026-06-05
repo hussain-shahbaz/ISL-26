@@ -1,6 +1,7 @@
 const express        = require('express');
 const examController = require('../controllers/exam_controller');
 const examAuthMiddleware = require('../middleware/exam_auth_middleware');
+const serviceAuth = require('../middleware/service_auth_middleware');
 
 class ExamRoutes {
   constructor() {
@@ -9,6 +10,8 @@ class ExamRoutes {
   }
 
   _bindRoutes() {
+    this.router.use(serviceAuth.verify.bind(serviceAuth));
+    
     this.router.post('/',                             (req, res) => examController.createExam(req, res)); //body
     this.router.get('/',                              (req, res) => examController.getAllExams(req, res)); //params and query
     this.router.get('/student',                       (req, res) => examController.getExamsByStudent(req, res));
