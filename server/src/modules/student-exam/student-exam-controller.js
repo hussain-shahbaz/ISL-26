@@ -87,23 +87,7 @@ class StudentExamController {
                 data : {}
             })
         }
-        // request attritubes needed :
-            //  id(from token)
-            //  (roll number, khud nikal lenge (cuz agar input lya to cehck bhi krna pre ga k apna hai ke nahi))
-            // 
-        // checks :
-            // get his user data
-            // check user exists
-            // check user is student
-        // filter : give exams that have his roll number in the array ... and are wither pusblished or sumbitted by student/marked by teacher
-        // call exam-module endpoint from service layer
-        // response attributes :
-            //  [
-            //      exam {
-                        // id,teacher,subject,examDate,examTime,duration,totalMarks,examType, examStatus
-                        // allow filters like teacher, subject, examType, date range etc
-            //      }
-            // ]  
+         
     }
 
     async getExamDetails(req, res) {
@@ -131,7 +115,36 @@ class StudentExamController {
                 data : {}
             })
         }
-        // request attributes needed :
+    }
+
+    async getSubmissionByExamIdAndStudentId(req, res) {
+        try {
+            const { examId } = req.params
+            const { studentId } = req.query
+            const details = await studentExamService.getSubmissionByExamIdAndStudentId(examId, studentId)
+            return res.status(200).json({
+                success: true,
+                message: 'Submission details fetched successfully',
+                statusCode: 200,
+                data: details
+            })
+        }
+        catch (error) {
+            console.log(`controller: failure ${error.message}`)
+            return res.status(500).json({
+                success: false,
+                error: error.message,
+                statusCode: 500,
+                data : {}
+            })
+        }
+    }
+}
+
+module.exports = new StudentExamController();
+
+
+ // request attributes needed :
             //  id(from token)
             // examId (from params)
 
@@ -141,10 +154,7 @@ class StudentExamController {
             // exam is published
             // exam is assigned to the student
             // API hit time is before the exam end time (examDate + examTime + duration) and after the exam start time (examDate + examTime)
-    }
-}
-
-module.exports = new StudentExamController();
+    
 
 // getMyExams
   
@@ -175,8 +185,28 @@ module.exports = new StudentExamController();
         // API hit time is after the exam end time (examDate + examTime + duration)
 
 // submitExam
-    
+
+
+// request attritubes needed :
+            //  id(from token)
+            //  (roll number, khud nikal lenge (cuz agar input lya to cehck bhi krna pre ga k apna hai ke nahi))
+            // 
+        // checks :
+            // get his user data
+            // check user exists
+            // check user is student
+        // filter : give exams that have his roll number in the array ... and are wither pusblished or sumbitted by student/marked by teacher
+        // call exam-module endpoint from service layer
+        // response attributes :
+            //  [
+            //      exam {
+                        // id,teacher,subject,examDate,examTime,duration,totalMarks,examType, examStatus
+                        // allow filters like teacher, subject, examType, date range etc
+            //      }
+            // ]
         
 
 // bonus
 // askForRecheck
+
+

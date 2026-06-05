@@ -11,7 +11,7 @@ class StudentExamService {
         data: {
           // _id : '101',
           // _id : '201',
-          _id : '301',
+          _id : '302',
           role: 'student',
           rollNumber: '12345'
         }
@@ -263,6 +263,20 @@ class StudentExamService {
       // exam is published
       // exam is assigned to the student
       // API hit time is before the exam end time (examDate + examTime + duration) and after the exam start time (examDate + examTime)
+  }
+
+  getSubmissionByExamIdAndStudentId(examId, studentId) {
+    // check if requester is legit
+    // no need to check if examId is legit or not, only valid are present in db
+    try{
+      if(studentId){
+        return studentExamRepository.findByExamIdAndStudentId(examId, studentId);
+      }
+      return studentExamRepository.findAllByExamId(examId);
+    }
+    catch (error) {
+      throw new Error(`Failed to fetch exam submission: ${error.message}`);
+    }
   }
 
 }

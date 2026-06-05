@@ -13,7 +13,8 @@ class StudentExamRoutes {
         
         this.router.post('/submit/:examId', StudentExamController.submitExam);
         this.router.get('/', StudentExamController.getAllExams);
-        this.router.get('/:id', StudentExamController.getExamDetails);
+        // this.router.get('/:id', StudentExamController.getExamDetails);
+        this.router.get('/result/:examId', StudentExamController.getSubmissionByExamIdAndStudentId);
     }
 
     getRouter() {
