@@ -1,11 +1,13 @@
 const examRepository = require('../repository/exam_repository');
+const ROLES = require('../config/roles');
+
 
 class ExamAuthMiddleware {
 
   async verifyExamOwner(req, res, next) {
     try {
 
-      if (req.user.role !== 'teacher') {
+      if (req.user.role !== ROLES.TEACHER) {
         return res.status(403).json({ status: 'error', message: 'Only teachers can access this' });
       }
       // jwt middleware ny pehly sy req.user set kr diya hoga

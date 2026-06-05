@@ -1,5 +1,6 @@
 const questionRepository = require('../repository/question_repository');
 const examRepository     = require('../repository/exam_repository');
+const ROLES = require('../config/roles');
 
 class QuestionAuthMiddleware {
 
@@ -8,7 +9,8 @@ class QuestionAuthMiddleware {
       if(req.headers['x-service-secret'] === process.env.SERVICE_SECRET) { // Allow if valid service secret is provided (for inter-service calls)
         return next();
       }
-      if (req.user.role !== 'teacher') {
+      
+      if (req.user.role !== ROLES.TEACHER) {
         return res.status(403).json({ status: 'error', message: 'Only teachers can access this' });
       }
       const instructorId = req.user.userId;
