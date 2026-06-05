@@ -37,6 +37,11 @@ class Config:
     DEBUG = FLASK_ENV == "development"
     TESTING = False
 
+    #Microservices URLS
+    SERVICE_SECRET = os.getenv("SERVICE_SECRET","")
+    SUBMISSION_BASE_URL = os.getenv("SUBMISSION_BASE_URL", "http://localhost:3005/api/v1/student-exam")
+    EXAM_BASE_URL = os.getenv("EXAM_BASE_URL", "http://localhost:3006/api/v1/exam")
+
     # Gemini — comma-separated keys rotate on quota errors
     GEMINI_API_KEYS = _GEMINI_KEYS
     GEMINI_API_KEY = _GEMINI_KEYS[0] if _GEMINI_KEYS else ""

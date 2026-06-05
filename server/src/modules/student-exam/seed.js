@@ -168,7 +168,7 @@ const SAMPLE_DATA = [
 async function seedDatabase() {
   try {
     // Connect to MongoDB
-    await mongoose.connect(process.env.MONGO_URI);
+    await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/student_exam_db');
     console.log('✓ Connected to MongoDB');
 
     // Clear existing data

@@ -6,9 +6,10 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node app.js",
-    "dev": "nodemon app.js",
-    "log": "nodemon src/modules/log/app.js",
-    "exam": "nodemon src/modules/exam/server.js"
+    "dev": "nodemon --env-file=.env app.js",
+    "log": "nodemon --env-file=src/modules/log/.env src/modules/log/app.js",
+    "exam": "nodemon --env-file=src/modules/exam/.env src/modules/exam/server.js",
+    "submission": "nodemon --env-file=src/modules/student-exam/.env src/modules/student-exam/server.js"
   },
   "keywords": [],
   "author": "",
