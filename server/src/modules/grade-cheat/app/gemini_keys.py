@@ -71,7 +71,7 @@ def get_key_pool() -> KeyPool:
 
 
 def run_with_retry(fn, label: str = "gemini"):
-    """Call fn(api_key); rotate keys and backoff on quota errors."""
+    """Call fn(api_key); rotate keys and backoff on quota errors. Fail fast on single-key quota."""
     pool = get_key_pool()
     wait = Config.GEMINI_RETRY_WAIT_SECONDS
     max_attempts = Config.GEMINI_MAX_RETRIES
@@ -80,10 +80,22 @@ def run_with_retry(fn, label: str = "gemini"):
     for attempt in range(1, max_attempts + 1):
         key = pool.current()
         if key is None:
-            delay = wait * min(attempt, 5)
+            # All keys exhausted
+            if pool.size == 1 and attempt == 2:
+                # Single key hit quota early — fail fast so Grok can take over
+                logger.warning("[%s] single key exhausted (quota hit) — failing to Grok", label)
+                raise QuotaExhaustedError(
+                    f"Gemini single key quota exhausted"
+                ) from last_error
+            
+            # Multiple keys: wait and reset
+            delay = min(wait * attempt, 300)  # Cap at 5 minutes
             logger.warning(
                 "[%s] all keys exhausted — waiting %ds (attempt %d/%d)",
-                label, delay, attempt, max_attempts,
+                label,
+                delay,
+                attempt,
+                max_attempts,
             )
             time.sleep(delay)
             pool.reset_exhausted()
@@ -98,7 +110,12 @@ def run_with_retry(fn, label: str = "gemini"):
                 raise
             last_error = exc
             pool.mark_exhausted(key)
-            logger.warning("[%s] quota error, rotating key (attempt %d/%d)", label, attempt, max_attempts)
+            logger.warning(
+                "[%s] quota error, rotating key (attempt %d/%d)",
+                label,
+                attempt,
+                max_attempts,
+            )
 
     raise QuotaExhaustedError(
         f"Gemini quota exhausted after {max_attempts} retries ({pool.size} keys)"

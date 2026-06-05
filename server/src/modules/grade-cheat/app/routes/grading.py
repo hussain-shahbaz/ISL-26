@@ -7,8 +7,7 @@ from flask import Blueprint, jsonify, request
 
 from app.data_provider import DataProvider
 from app.models import ExamResultRepository
-from app.services import ExamAnalysisService
-from app.services.task_tracker import ExamTaskAlreadyRunning, TaskTracker
+from app.services import ExamAnalysisService, ExamTaskAlreadyRunning, TaskTracker
 from app.tasks.grading_tasks import grade_exam_task
 
 logger = logging.getLogger(__name__)

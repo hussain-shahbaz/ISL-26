@@ -1,4 +1,4 @@
-"""Async grading task state in Redis (live) + MongoDB (history)."""
+"""Task tracking: async grading task state in Redis (live) + MongoDB (history)."""
 
 import logging
 from datetime import datetime
@@ -10,10 +10,14 @@ from app.models import GradingTaskRepository
 
 logger = logging.getLogger(__name__)
 
+__all__ = ["TaskTracker", "ExamTaskAlreadyRunning"]
+
 ACTIVE_STATUSES = ("pending", "processing")
 
 
 class ExamTaskAlreadyRunning(Exception):
+    """Exception raised when exam already has active grading task."""
+
     def __init__(self, exam_id: str, task_id: str):
         self.exam_id = exam_id
         self.task_id = task_id
@@ -21,6 +25,8 @@ class ExamTaskAlreadyRunning(Exception):
 
 
 class TaskTracker:
+    """Track async grading task progress and state."""
+
     def __init__(self):
         self.task_repo = GradingTaskRepository()
 
@@ -84,6 +90,7 @@ class TaskTracker:
         return task_id
 
     def start_task(self, task_id: str) -> bool:
+        """Mark task as processing."""
         progress = redis_client.get_task_progress(task_id)
         if not progress:
             return False
@@ -96,6 +103,7 @@ class TaskTracker:
         return True
 
     def update_progress(self, task_id: str, questions_graded: int, failed: int = 0) -> bool:
+        """Update task progress."""
         progress = redis_client.get_task_progress(task_id)
         if not progress:
             return False
@@ -111,14 +119,18 @@ class TaskTracker:
         }
 
         redis_client.set_task_progress(task_id, progress)
-        self.task_repo.update_task(task_id, {
-            "questions_graded": progress["questions_graded"],
-            "questions_failed": progress["questions_failed"],
-            "progress": progress["progress"],
-        })
+        self.task_repo.update_task(
+            task_id,
+            {
+                "questions_graded": progress["questions_graded"],
+                "questions_failed": progress["questions_failed"],
+                "progress": progress["progress"],
+            },
+        )
         return True
 
     def complete_task(self, task_id: str, result: Dict[str, Any]) -> bool:
+        """Mark task as completed."""
         progress = redis_client.get_task_progress(task_id)
         if not progress:
             return False
@@ -131,16 +143,20 @@ class TaskTracker:
         progress["progress"]["current"] = progress["total_questions"]
 
         redis_client.set_task_progress(task_id, progress)
-        self.task_repo.update_task(task_id, {
-            "status": "completed",
-            "completed_at": now,
-            "result": result,
-            "progress": progress["progress"],
-        })
+        self.task_repo.update_task(
+            task_id,
+            {
+                "status": "completed",
+                "completed_at": now,
+                "result": result,
+                "progress": progress["progress"],
+            },
+        )
         redis_client.release_exam_lock(progress["exam_id"])
         return True
 
     def fail_task(self, task_id: str, error: str) -> bool:
+        """Mark task as failed."""
         progress = redis_client.get_task_progress(task_id)
         if not progress:
             return False
@@ -151,15 +167,19 @@ class TaskTracker:
         progress["error"] = error
 
         redis_client.set_task_progress(task_id, progress)
-        self.task_repo.update_task(task_id, {
-            "status": "failed",
-            "completed_at": now,
-            "error": error,
-        })
+        self.task_repo.update_task(
+            task_id,
+            {
+                "status": "failed",
+                "completed_at": now,
+                "error": error,
+            },
+        )
         redis_client.release_exam_lock(progress["exam_id"])
         return True
 
     def get_task_progress(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """Get task progress from Redis or MongoDB."""
         progress = redis_client.get_task_progress(task_id)
         if progress:
             return progress
@@ -170,9 +190,11 @@ class TaskTracker:
         return None
 
     def get_tasks_by_exam(self, exam_id: str):
+        """Get all tasks for an exam."""
         return self.task_repo.find_by_exam(exam_id)
 
     def delete_task(self, task_id: str) -> bool:
+        """Delete task from both Redis and MongoDB."""
         progress = redis_client.get_task_progress(task_id)
         exam_id = progress.get("exam_id") if progress else None
 

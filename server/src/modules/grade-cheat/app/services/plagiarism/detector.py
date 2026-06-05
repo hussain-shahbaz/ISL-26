@@ -10,10 +10,13 @@ from app.semantic_index import index_exam_answers, query_similar_peers
 
 logger = logging.getLogger(__name__)
 
+__all__ = ["check_plagiarism", "prepare_plagiarism_index", "is_semantic_index_ready"]
+
 _semantic_index_ready: Dict[str, bool] = {}
 
 
 def _tokenize(text: str) -> List[str]:
+    """Tokenize text into lowercase words."""
     return re.findall(r"\w+", text.lower())
 
 
@@ -27,13 +30,16 @@ def compute_tfidf_similarity(text1: str, text2: str, corpus: List[str]) -> float
     if not tokens1 or not tokens2:
         return 0.0
 
+    # Build corpus with all documents
     tokenized_corpus = [_tokenize(doc) for doc in corpus]
+    
+    # Calculate document frequency for IDF
     doc_frequency: Dict[str, int] = {}
     for doc in tokenized_corpus:
         for word in set(doc):
             doc_frequency[word] = doc_frequency.get(word, 0) + 1
 
-    num_docs = len(corpus)
+    num_docs = max(len(corpus), 2)  # Ensure minimum corpus size for meaningful IDF
 
     def to_tfidf_vector(tokens: List[str]) -> Dict[str, float]:
         tf: Dict[str, int] = {}
@@ -41,21 +47,28 @@ def compute_tfidf_similarity(text1: str, text2: str, corpus: List[str]) -> float
             tf[token] = tf.get(token, 0) + 1
         vec: Dict[str, float] = {}
         for token, count in tf.items():
-            idf = math.log(num_docs / (doc_frequency.get(token, 0) + 1)) if num_docs else 1.0
-            vec[token] = count * max(0.0001, idf)
+            # IDF with smoothing to handle small corpora
+            idf = math.log(1 + num_docs / (1 + doc_frequency.get(token, 0)))
+            vec[token] = count * idf
         return vec
 
     vec1 = to_tfidf_vector(tokens1)
     vec2 = to_tfidf_vector(tokens2)
-    dot = sum(vec1[w] * vec2.get(w, 0.0) for w in vec1)
+    
+    # Cosine similarity
+    dot = sum(vec1.get(w, 0.0) * vec2.get(w, 0.0) for w in set(vec1.keys()) | set(vec2.keys()))
     mag1 = math.sqrt(sum(v ** 2 for v in vec1.values()))
     mag2 = math.sqrt(sum(v ** 2 for v in vec2.values()))
+    
     if mag1 == 0.0 or mag2 == 0.0:
         return 0.0
-    return dot / (mag1 * mag2)
+    
+    similarity = dot / (mag1 * mag2)
+    return max(0.0, min(1.0, similarity))  # Clamp to [0, 1]
 
 
 def _combined_score(semantic: float, tfidf: float) -> float:
+    """Weighted combination: 60% semantic + 40% TF-IDF."""
     return (Config.SEMANTIC_WEIGHT * semantic) + (Config.TFIDF_WEIGHT * tfidf)
 
 
@@ -83,10 +96,12 @@ def prepare_plagiarism_index(exam_id: str, submissions: List[Dict[str, Any]]) ->
 
 
 def is_semantic_index_ready(exam_id: str) -> bool:
+    """Check if semantic index is ready for an exam."""
     return _semantic_index_ready.get(exam_id, False)
 
 
 def _no_peer_result() -> Dict[str, Any]:
+    """Default result when no peers found."""
     return {
         "cheatingScore": 0.0,
         "cheatingFlag": False,
@@ -100,6 +115,7 @@ def _no_peer_result() -> Dict[str, Any]:
 
 
 def _find_exact_peer_match(submitted_answer: str, peers: List[Dict[str, str]]) -> Optional[Dict[str, str]]:
+    """Find exact text match in peer answers."""
     for peer in peers:
         if submitted_answer == peer["answer"]:
             return peer
@@ -113,6 +129,7 @@ def _result_from_match(
     peer_answer: str,
     exact_copy: bool = False,
 ) -> Dict[str, Any]:
+    """Format cheating detection result."""
     if exact_copy:
         semantic_score = 1.0
         tfidf_score = 1.0

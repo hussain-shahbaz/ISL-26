@@ -7,7 +7,7 @@ from google.genai import types
 
 from app.config import Config
 from app.gemini_keys import run_with_retry
-from app.services.rate_limiter import call_with_limit
+from app.services.grading.rate_limiter import call_with_limit
 
 
 def _embed(api_key: str, texts: List[str], task_type: str) -> List[List[float]]:

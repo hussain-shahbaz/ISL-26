@@ -1,4 +1,4 @@
-"""Text grading: Gemini first (google-genai), Grok fallback (requests)."""
+"""Text grading: Gemini first (google-genai), Groq fallback (OpenAI-compatible)."""
 
 import json
 import logging
@@ -7,15 +7,15 @@ from typing import Any, Dict, Optional
 import requests
 from google import genai
 from google.genai import types
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, field_validator
 
 from app.config import Config
 from app.gemini_keys import QuotaExhaustedError, run_with_retry
-from app.services.rate_limiter import call_with_limit, retry_with_backoff
+from app.services.grading.rate_limiter import call_with_limit, retry_with_backoff
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["GeminiGradingService", "GrokGradingService"]
+__all__ = ["GeminiGradingService", "GroqGradingService"]
 
 
 class GradingOutput(BaseModel):
@@ -25,6 +25,23 @@ class GradingOutput(BaseModel):
     whyWrong: Optional[str] = None
     reasoning: str
     confidence: float
+
+    @field_validator("confidence", mode="before")
+    @classmethod
+    def convert_confidence(cls, v):
+        """Convert text confidence (High/Medium/Low) to 0-1 float."""
+        if isinstance(v, (int, float)):
+            return float(v)
+        if isinstance(v, str):
+            mapping = {
+                "high": 0.85,
+                "medium": 0.65,
+                "low": 0.40,
+                "very high": 0.95,
+                "very low": 0.20,
+            }
+            return mapping.get(v.lower().strip(), 0.65)
+        return 0.65
 
 
 _SYSTEM = {
@@ -47,7 +64,8 @@ def _user_prompt(question_text, reference_answer, submitted_answer, marks) -> st
         f"Reference: {reference_answer}\n"
         f"Student: {submitted_answer}\n"
         f"Max marks: {marks}\n"
-        "Return JSON only with keys: score, isCorrect, feedback, whyWrong, reasoning, confidence."
+        "Return JSON only with keys: score, isCorrect, feedback, whyWrong, reasoning, "
+        "confidence (float 0-1, where 0.9+ is high confidence, 0.5-0.7 is medium, <0.5 is low)."
     )
 
 
@@ -55,7 +73,8 @@ def _parse_grading_json(content: str) -> GradingOutput:
     text = (content or "").strip()
     if text.startswith("```"):
         text = text.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-    return GradingOutput.model_validate(json.loads(text))
+    data = json.loads(text)
+    return GradingOutput.model_validate(data)
 
 
 def _format_result(result: GradingOutput, marks: int) -> Dict[str, Any]:
@@ -74,8 +93,8 @@ def _format_result(result: GradingOutput, marks: int) -> Dict[str, Any]:
     }
 
 
-class GrokGradingService:
-    """Grade via xAI Grok HTTP API."""
+class GroqGradingService:
+    """Grade via Groq API (free/cheap OpenAI-compatible endpoint)."""
 
     def grade_answer(
         self,
@@ -86,8 +105,8 @@ class GrokGradingService:
         mode: str = "medium",
         additional_instructions: Optional[str] = None,
     ) -> Dict[str, Any]:
-        if not Config.GROK_API_KEY:
-            return {"success": False, "error": "GROK_API_KEY not configured"}
+        if not Config.GROQ_API_KEY:
+            return {"success": False, "error": "GROQ_API_KEY not configured"}
 
         if mode not in _SYSTEM:
             mode = "medium"
@@ -96,21 +115,23 @@ class GrokGradingService:
         user = _user_prompt(question_text, reference_answer, submitted_answer, marks)
 
         def _call():
+            # Groq uses OpenAI-compatible /chat/completions endpoint
+            url = f"{Config.GROQ_BASE_URL}/chat/completions"
             resp = requests.post(
-                f"{Config.GROK_BASE_URL.rstrip('/')}/chat/completions",
+                url,
                 headers={
-                    "Authorization": f"Bearer {Config.GROK_API_KEY}",
+                    "Authorization": f"Bearer {Config.GROQ_API_KEY}",
                     "Content-Type": "application/json",
                 },
                 json={
-                    "model": Config.GROK_MODEL,
+                    "model": Config.GROQ_MODEL,
                     "messages": [
                         {"role": "system", "content": system},
                         {"role": "user", "content": user},
                     ],
                     "temperature": 0.3,
                 },
-                timeout=Config.GROK_TIMEOUT,
+                timeout=Config.GROQ_TIMEOUT,
             )
             resp.raise_for_status()
             return _parse_grading_json(resp.json()["choices"][0]["message"]["content"])
@@ -118,22 +139,22 @@ class GrokGradingService:
         try:
             result = retry_with_backoff(
                 _call,
-                label="grok",
-                max_retries=Config.GEMINI_MAX_RETRIES,
-                wait_seconds=Config.GEMINI_RETRY_WAIT_SECONDS,
+                label="groq",
+                max_retries=3,
+                wait_seconds=10,
             )
-            logger.info("Graded via Grok")
+            logger.info("Graded via Groq")
             return _format_result(result, marks)
         except Exception as exc:
-            logger.exception("Grok grading failed")
+            logger.exception("Groq grading failed: %s", exc)
             return {"success": False, "error": str(exc)}
 
 
 class GeminiGradingService:
-    """Grade via Gemini API; falls back to Grok on quota/errors."""
+    """Grade via Gemini API; falls back to Groq on quota/errors."""
 
     def __init__(self):
-        self._grok = GrokGradingService()
+        self._groq = GroqGradingService()
 
     def _call_gemini(self, api_key, question_text, reference_answer, submitted_answer, marks, mode, extra):
         system = _system_prompt(mode, extra)
@@ -168,16 +189,22 @@ class GeminiGradingService:
 
         args = (question_text, reference_answer, submitted_answer, marks, mode, additional_instructions)
 
+        # Try Gemini first if keys are configured
         if Config.GEMINI_API_KEYS:
             try:
                 result = run_with_retry(
                     lambda key: self._call_gemini(key, *args),
                     label="gemini",
                 )
+                logger.info("Graded via Gemini")
                 return _format_result(result, marks)
             except QuotaExhaustedError:
-                logger.warning("Gemini quota exhausted — using Grok")
+                logger.warning("Gemini quota exhausted — using Groq")
             except Exception as exc:
-                logger.warning("Gemini failed (%s) — using Grok", exc)
+                logger.warning("Gemini failed: %s — using Groq", str(exc)[:100])
 
-        return self._grok.grade_answer(*args)
+        # Fall back to Groq
+        logger.info("Falling back to Groq")
+        return self._groq.grade_answer(
+            question_text, reference_answer, submitted_answer, marks, mode, additional_instructions
+        )

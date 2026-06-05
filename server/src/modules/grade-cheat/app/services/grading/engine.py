@@ -1,11 +1,17 @@
-"""Route MCQ to exact match, text answers to Gemini (Grok fallback)."""
+"""Grading engine: route MCQ to exact match, text answers to LLM."""
 
+import logging
 from typing import Any, Dict, Optional
 
-from app.services.gemini_service import GeminiGradingService
+from app.services.grading.llm_grader import GeminiGradingService
+
+logger = logging.getLogger(__name__)
+
+__all__ = ["grade_mcq", "grade_question"]
 
 
 def grade_mcq(submitted_answer: str, reference_answer: str, marks: int) -> Dict[str, Any]:
+    """Grade MCQ by exact match (case-insensitive)."""
     submitted = submitted_answer.strip()
     reference = reference_answer.strip()
     ok = submitted.lower() == reference.lower()
@@ -31,6 +37,7 @@ def grade_question(
     grader: Optional[GeminiGradingService] = None,
     additional_instructions: Optional[str] = None,
 ) -> Dict[str, Any]:
+    """Grade a question: MCQ by exact match, text by LLM."""
     q_type = question.get("type") or answer.get("questionType", "text")
 
     if q_type == "mcq":
