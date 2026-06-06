@@ -1,200 +1,115 @@
 const studentExamService = require('./student-exam-service');
 
+// Map a business error to an HTTP status. Validation/eligibility failures are
+// client errors (400); anything unexpected surfaces as 500.
+function statusFor(message) {
+  const clientErrorMarkers = [
+    'Validation failed',
+    'Validator:',
+    'already been submitted',
+    'Exam has ended',
+    'not allowed',
+    'not assigned',
+    'not available',
+    'not started',
+    'not published',
+    'Exam not found',
+  ];
+  return clientErrorMarkers.some((m) => message.includes(m)) ? 400 : 500;
+}
+
+function fail(res, error) {
+  const code = statusFor(error.message || '');
+  return res.status(code).json({
+    status: 'error',
+    error_code: code,
+    message: error.message,
+    timestamp: new Date().toISOString(),
+  });
+}
+
 class StudentExamController {
 
     async submitExam(req, res) {
         try {
-            const id = req.user.userId; // verified identity propagated by the gateway
+            const studentId = req.user.userId; // verified identity propagated by the gateway
             const { examId } = req.params;
             const { answers } = req.body;
-            const submittedAt = new Date(); // server-authoritative submission time
-            const submissionData = {
-                studentId: id,
-                examId: examId,
-                answers: answers.map(ans => {
-                    return {
-                        questionId: ans.question.questionId,
-                        submittedAnswer: ans.submittedAnswer
-                    };
-                }),
-                submittedAt,
+
+            if (!Array.isArray(answers) || answers.length === 0) {
+                return res.status(400).json({
+                    status: 'error', error_code: 400,
+                    message: 'answers must be a non-empty array',
+                    timestamp: new Date().toISOString(),
+                });
             }
 
-            
+            const submissionData = {
+                studentId,
+                examId,
+                answers: answers.map((ans) => ({
+                    questionId: ans.question.questionId,
+                    submittedAnswer: ans.submittedAnswer,
+                })),
+                submittedAt: new Date(), // server-authoritative submission time
+            };
+
             const result = await studentExamService.submitExam(submissionData);
-            console.log('controller: success')
-            res.status(200).json({
-                success: true,
+            return res.status(201).json({
+                status: 'success',
                 message: 'Exam submitted successfully',
-                statusCode: 200,
-                data: result
-            })
-        }
-        catch (error) {
-            console.log(`ontroller: failure ${error.message}`)
-            return res.status(500).json({
-                success: false,
-                error: error.message,
-                statusCode: 500,
-                data : {}
+                data: result,
             });
+        } catch (error) {
+            return fail(res, error);
         }
-
-
-        // request attributes needed :
-            //  id(from token)
-            //  examId (from params)
-            //  answers (from body)
-
-        // checks:
-            // id is student    
-            // examId is valid
-            // exam is published
-            // exam is assigned to the student
-            // exam is not already submitted
-            // API hit time is before the exam end time (examDate + examTime + duration) and after the exam start time (examDate + examTime)
-
-        // response:
-            // success message
     }
 
     async getAllExams(req, res) {
         try {
-            const studentId = req.user.userId; // verified identity from the gateway
-            const exams = await studentExamService.getAllExams(studentId);
+            const exams = await studentExamService.getAllExams(req.user.userId);
             return res.status(200).json({
-                success: true,
+                status: 'success',
                 message: 'Exams fetched successfully',
-                statusCode: 200,
-                data: exams
-            })
+                data: exams,
+            });
+        } catch (error) {
+            return fail(res, error);
         }
-        catch (error) {
-            console.log(`controller: failure ${error.message}`)
-            return res.status(500).json({
-                success: false,
-                error: error.message,
-                statusCode: 500,
-                data : {}
-            })
-        }
-         
     }
 
     async getExamDetails(req, res) {
         try {
-            const id = req.user.userId; // verified identity from the gateway
             const { examId } = req.params;
-            const currentTime = new Date(); // server-authoritative time of request
-            const examDetails = await studentExamService.getExamDetails(examId, id, currentTime);
+            const examDetails = await studentExamService.getExamDetails(
+                examId,
+                req.user.userId,
+                new Date(),
+            );
             return res.status(200).json({
-                success: true,
+                status: 'success',
                 message: 'Exam details fetched successfully',
-                statusCode: 200,
-                data: examDetails
-            })
-        }
-        catch (error) {
-            console.log(`controller: failure ${error.message}`)
-            return res.status(500).json({
-                success: false,
-                error: error.message,
-                statusCode: 500,
-                data : {}
-            })
+                data: examDetails,
+            });
+        } catch (error) {
+            return fail(res, error);
         }
     }
 
     async getSubmissionByExamIdAndStudentId(req, res) {
         try {
-            const { examId } = req.params
-            const { studentId } = req.query
-            const details = await studentExamService.getSubmissionByExamIdAndStudentId(examId, studentId)
+            const { examId } = req.params;
+            const { studentId } = req.query;
+            const details = await studentExamService.getSubmissionByExamIdAndStudentId(examId, studentId);
             return res.status(200).json({
-                success: true,
+                status: 'success',
                 message: 'Submission details fetched successfully',
-                statusCode: 200,
-                data: details
-            })
-        }
-        catch (error) {
-            console.log(`controller: failure ${error.message}`)
-            return res.status(500).json({
-                success: false,
-                error: error.message,
-                statusCode: 500,
-                data : {}
-            })
+                data: details,
+            });
+        } catch (error) {
+            return fail(res, error);
         }
     }
 }
 
 module.exports = new StudentExamController();
-
-
- // request attributes needed :
-            //  id(from token)
-            // examId (from params)
-
-        // checks:
-            // id is student
-            // examId is valid
-            // exam is published
-            // exam is assigned to the student
-            // API hit time is before the exam end time (examDate + examTime + duration) and after the exam start time (examDate + examTime)
-    
-
-// getMyExams
-  
-
-
-// getExamDetails
-    
-
-    // call exam-module endpoint from service layer
-
-    // reposonse: 
-        // exam {
-        //     id,teacher,subject,examDate,examTime,duration,totalMarks,examType, examStatus
-        //     questions
-        // }
-
-
-// getExamResult
-    // request attributes needed :
-        //  id(from token)
-        //  examId (from params)
-    
-    // checks:
-        // id is student
-        // examId is valid
-        // exam is marked
-        // exam is assigned to the student
-        // API hit time is after the exam end time (examDate + examTime + duration)
-
-// submitExam
-
-
-// request attritubes needed :
-            //  id(from token)
-            //  (roll number, khud nikal lenge (cuz agar input lya to cehck bhi krna pre ga k apna hai ke nahi))
-            // 
-        // checks :
-            // get his user data
-            // check user exists
-            // check user is student
-        // filter : give exams that have his roll number in the array ... and are wither pusblished or sumbitted by student/marked by teacher
-        // call exam-module endpoint from service layer
-        // response attributes :
-            //  [
-            //      exam {
-                        // id,teacher,subject,examDate,examTime,duration,totalMarks,examType, examStatus
-                        // allow filters like teacher, subject, examType, date range etc
-            //      }
-            // ]
-        
-
-// bonus
-// askForRecheck
-
-
