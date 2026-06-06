@@ -18,11 +18,11 @@ class StudentExamValidator {
       errors.push(' Validator: Exam is not assigned to this student');
     }
     const date = new Date(exam.scheduledTime);
-    const submittedTime = new Date(date.getTime() + (exam.  timeAllowed * 60 * 1000));
-    if(new Date(submissionData.submissionTime) < date){
+    const submittedTime = new Date(date.getTime() + (exam.timeAllowed * 60 * 1000));
+    if(new Date(submissionData.submittedAt) < date){
       errors.push(' Validator: Exam has not started yet');
     }
-    if(new Date(submissionData.submissionTime) > submittedTime){
+    if(new Date(submissionData.submittedAt) > submittedTime){
       errors.push(' Validator: Exam has ended');
     }
 

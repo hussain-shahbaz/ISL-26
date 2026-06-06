@@ -4,26 +4,20 @@ class StudentExamController {
 
     async submitExam(req, res) {
         try {
-            // manipulate this according to the request body
-            // const id = req.user.id; // from token
-            // const id = '101'; // for testing purpose, change it to above line when token is implemented
-            // const id = '201'; // for testing purpose, change it to above line when token is implemented
-            const id = '301'; // for testing purpose, change it to above line when token is implemented
+            const id = req.user.userId; // verified identity propagated by the gateway
             const { examId } = req.params;
             const { answers } = req.body;
-            const submissionTime = new Date("2026-05-24T12:17:00.000Z");
+            const submittedAt = new Date(); // server-authoritative submission time
             const submissionData = {
                 studentId: id,
-                examId:examId,
-                answers:  answers.map(ans => {
-                        return {
-                            questionId: ans.question.questionId,
-                            submittedAnswer: ans.submittedAnswer
-                        }
-                        // 
-                    })
-                ,
-                submittedAt : new Date(submissionTime),
+                examId: examId,
+                answers: answers.map(ans => {
+                    return {
+                        questionId: ans.question.questionId,
+                        submittedAnswer: ans.submittedAnswer
+                    };
+                }),
+                submittedAt,
             }
 
             
@@ -66,10 +60,7 @@ class StudentExamController {
 
     async getAllExams(req, res) {
         try {
-            // const id = req.user.id; // from token
-            const studentId = '101'; // for testing purpose, change it to above line when token is implemented
-            // const id = '201'; // for testing purpose, change it to above line when token is implemented
-            // const id = '301'; // for testing purpose, change it to above line when token is implemented
+            const studentId = req.user.userId; // verified identity from the gateway
             const exams = await studentExamService.getAllExams(studentId);
             return res.status(200).json({
                 success: true,
@@ -92,13 +83,10 @@ class StudentExamController {
 
     async getExamDetails(req, res) {
         try {
-            // const id = req.user.id; // from token
-            const id = '101'; // for testing purpose, change it to above line when token is implemented
-            // const id = '201'; // for testing purpose, change it to above line when token is implemented
-            // const id = '301'; // for testing purpose, change it to above line when token is implemented
+            const id = req.user.userId; // verified identity from the gateway
             const { examId } = req.params;
-            const currentTime = new Date("2025-05-26T05:00:00.000Z"); // time of api hit
-            const examDetails = await studentExamService.getExamDetails(id, examId, currentTime);
+            const currentTime = new Date(); // server-authoritative time of request
+            const examDetails = await studentExamService.getExamDetails(examId, id, currentTime);
             return res.status(200).json({
                 success: true,
                 message: 'Exam details fetched successfully',
