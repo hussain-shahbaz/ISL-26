@@ -77,14 +77,22 @@ def build_peer_index(submissions: List[Dict[str, Any]]) -> Dict[str, List[Dict[s
     index: Dict[str, List[Dict[str, str]]] = {}
     for submission in submissions:
         student_id = submission.get("studentId", "")
+        logger.debug(f"Processing submission for student: {student_id}")
         for answer in submission.get("answers", []):
-            if answer.get("questionType") != "text":
+            q_id = answer.get("questionId") or answer.get("_id")
+            if not q_id:
+                logger.warning("Answer missing questionId and _id, skipping: %s", answer)
                 continue
+            
             text = answer.get("submittedAnswer", "").strip()
             if not text:
+                logger.debug("Skipping empty answer for question %s", q_id)
                 continue
-            q_id = answer["questionId"]
+            
+            logger.debug(f"Indexing text answer for q_id={q_id}, student={student_id}")
             index.setdefault(q_id, []).append({"studentId": student_id, "answer": text})
+    
+    logger.debug(f"Peer index built with {len(index)} questions: {list(index.keys())}")
     return index
 
 

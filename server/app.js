@@ -6,6 +6,7 @@ const cookieParser =  require("cookie-parser");
 const loggerMiddleware = require('./src/common/middleware/logger-middleware');
 const LogQueue = require('./src/common/queue/log-queue');
 const AttachAuth = require('../server/auth-service/src/app').default; // Import and attach auth service app
+const microserviceRoutes = require('./src/common/microservices/microservice-routes');
 
 const auth = require('./auth-service/src/app'); // Import auth service app for internal calls (if needed)
 
@@ -38,7 +39,8 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Routes
+// Microservice routes - all microservices delegated through /api/modules/:service/*
+app.use('/api/modules', microserviceRoutes.getRouter());
 
 // 404 handler
 app.use((req, res) => {

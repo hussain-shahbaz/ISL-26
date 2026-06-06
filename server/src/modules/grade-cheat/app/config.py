@@ -40,7 +40,7 @@ class Config:
     #Microservices URLS
     SERVICE_SECRET = os.getenv("SERVICE_SECRET","")
     SUBMISSION_BASE_URL = os.getenv("SUBMISSION_BASE_URL", "http://localhost:3005/api/v1/student-exam")
-    EXAM_BASE_URL = os.getenv("EXAM_BASE_URL", "http://localhost:3006/api/v1/exam")
+    EXAM_BASE_URL = os.getenv("EXAM_BASE_URL", "http://localhost:3002/api/exam")
 
     # Gemini — comma-separated keys rotate on quota errors
     GEMINI_API_KEYS = _GEMINI_KEYS
@@ -63,7 +63,7 @@ class Config:
 
     # MongoDB
     MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
-    MONGODB_DB = os.getenv("MONGODB_DB", "exam_grading")
+    MONGODB_DB = os.getenv("MONGODB_DB", "grades")
 
     # Redis / Celery
     REDIS_URL = os.getenv("REDIS_URL", "redis://172.28.244.79:6379/0")

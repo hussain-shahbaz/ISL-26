@@ -84,17 +84,26 @@ def index_exam_answers(exam_id: str, submissions: List[Dict[str, Any]]) -> bool:
         return False
 
     docs, ids, meta = [], [], []
+    logger.debug(f"Indexing answers for exam {exam_id}")
+    
     for sub in submissions:
         sid = sub.get("studentId", "")
+        logger.debug(f"Processing submission from student {sid}")
+        
         for ans in sub.get("answers", []):
-            if ans.get("questionType") != "text":
-                continue
             text = ans.get("submittedAnswer", "").strip()
             if not text:
+                logger.debug(f"Skipping empty answer for student {sid}")
                 continue
-            qid = ans["questionId"]
+            
+            qid = ans.get("questionId") or ans.get("_id")
+            if not qid:
+                logger.warning(f"Answer missing questionId and _id for student {sid}")
+                continue
+            
+            logger.debug(f"Indexing text answer: exam={exam_id}, student={sid}, question={qid}")
             docs.append(text)
-            ids.append(f"{exam_id}__{sid}__{qid}")   # double-underscore avoids accidental collisions
+            ids.append(f"{exam_id}__{sid}__{qid}")
             meta.append({"examId": exam_id, "studentId": sid, "questionId": qid})
 
     if not docs:
@@ -104,14 +113,16 @@ def index_exam_answers(exam_id: str, submissions: List[Dict[str, Any]]) -> bool:
     try:
         col = _get_collection()
         if col is None:
+            logger.error("Failed to get ChromaDB collection")
             return False
 
+        logger.debug(f"Embedding {len(docs)} documents for exam {exam_id}")
         embeddings = embed_documents(docs)
         if not embeddings or len(embeddings) != len(docs):
             logger.error("Embedding count mismatch: got %d for %d docs", len(embeddings) if embeddings else 0, len(docs))
             return False
 
-        # Upsert = insert-or-update; safe to call multiple times for the same exam
+        logger.debug(f"Upserting {len(docs)} documents to ChromaDB")
         col.upsert(documents=docs, ids=ids, metadatas=meta, embeddings=embeddings)
         logger.info("Indexed %d answers for exam %s (collection total: %d)", len(docs), exam_id, col.count())
         return True

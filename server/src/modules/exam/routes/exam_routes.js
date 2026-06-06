@@ -11,7 +11,11 @@ class ExamRoutes {
 
   _bindRoutes() {
     this.router.use(serviceAuth.verify.bind(serviceAuth));
-    
+    this.router.get('/:id',
+      serviceAuth.verify.bind(serviceAuth),
+      (req,res)=>{
+      examController.getExamById(req,res);
+    })
     this.router.post('/',                             (req, res) => examController.createExam(req, res)); //body
     this.router.get('/',                              (req, res) => examController.getAllExams(req, res)); //params and query
     this.router.get('/student',                       (req, res) => examController.getExamsByStudent(req, res));

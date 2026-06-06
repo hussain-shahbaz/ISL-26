@@ -34,6 +34,13 @@ class ExamService {
     return exam;
   }
 
+  async getExamWithQuestions(examId) {
+    const exam = await examRepository.findById(examId);
+    if (!exam) throw new Error('Exam not found');
+    const questions = await questionRepository.findByExamId(examId);
+    return { ...exam, questions };
+  }
+
   async getExamsByTeacher(instructorId) {
     return await examRepository.findByTeacherId(instructorId);
   }
