@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAllExams, deleteExam } from '../services/exam_service';
+import ExamCard from '../components/exams/ExamCard';
 
 const ExamsPage = () => {
   const [exams, setExams] = useState([]);
@@ -8,17 +9,21 @@ const ExamsPage = () => {
 
   useEffect(() => {
     const fetchExams = async () => {
-      console.log(import.meta.env.VITE_API_URL)
-      const res = await getAllExams();
-      setExams(res.data.data|| []);
-    };
+    const res = await getAllExams();
+    const data = res.data.data || [];
+    setExams(data);
+
+    // subjects nikal ke store karo
+    const subjects = [...new Set(data.map(e => e.subject).filter(Boolean))];
+    localStorage.setItem('recentSubjects', JSON.stringify(subjects));
+  };
     fetchExams();
   }, []);
 
   const handleDelete = async (id) => {
     await deleteExam(id);
     const res = await getAllExams();
-    setExams(res.data.data);
+    setExams(res.data.data || []);
   };
 
   return (
@@ -27,14 +32,7 @@ const ExamsPage = () => {
       <button onClick={() => navigate('/create')}>Create New Exam</button>
 
       {exams.map((exam) => (
-        <div key={exam._id}>
-          <h2>{exam.title}</h2>
-          <p>{exam.subject}</p>
-          <p>Status: {exam.status}</p>
-          <p>Total Marks: {exam.totalMarks}</p>
-          <button onClick={() => navigate(`/exam/${exam._id}`)}>View</button>
-          <button onClick={() => handleDelete(exam._id)}>Delete</button>
-        </div>
+        <ExamCard key={exam._id} exam={exam} onDelete={handleDelete} />
       ))}
     </div>
   );

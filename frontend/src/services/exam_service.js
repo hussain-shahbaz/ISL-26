@@ -1,9 +1,11 @@
 import api from './api';
 
-// ─── Exam APIs ───────────────────────────────────────
-
+// Exam APIs
 export const getAllExams = (subject) =>
   api.get('/exam', { params: subject ? { subject } : {} });
+
+export const getExamById = (id) =>
+  api.get(`/exam/${id}`);
 
 export const createExam = (data) =>
   api.post('/exam', data);
@@ -17,8 +19,7 @@ export const updateExamStatus = (id, status) =>
 export const deleteExam = (id) =>
   api.delete(`/exam/${id}`);
 
-// ─── Question APIs ────────────────────────────────────
-
+// Question APIs
 export const getQuestionsByExam = (examId) =>
   api.get(`/exam/question/${examId}`);
 

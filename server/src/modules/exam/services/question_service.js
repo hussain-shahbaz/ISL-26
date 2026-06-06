@@ -12,6 +12,12 @@ class QuestionService {
       throw new Error('Cannot add question to a published, submitted or checked exam');
     }
 
+    const existing = await questionRepository.findByExamId(examId);
+    const duplicate = existing.find(
+      (q) => q.questionText.trim().toLowerCase() === data.questionText.trim().toLowerCase()
+    );
+    if (duplicate) throw new Error('Question already exists in this exam');
+
     const result = await questionRepository.createQuestion({ ...data, examId });
 
     await examRepository.updateById(examId, { 
@@ -86,7 +92,7 @@ class QuestionService {
       throw new Error('Cannot update question of a published, submitted or checked exam');
     }
 
-    delete data.examId;
+    // delete data.examId;
 
     const result = await questionRepository.updateById(id, data);
     if (data.marks !== undefined) {
@@ -109,9 +115,14 @@ class QuestionService {
     }
 
     const result = await questionRepository.deleteById(id);
-
+    
+    const remainingQuestions = await questionRepository.findByExamId(question.examId);
+    
+    // unka total nikalo
+    const newTotal = remainingQuestions.reduce((sum, q) => sum + q.marks, 0);
+    console.log(newTotal)
     await examRepository.updateById(question.examId, { 
-      totalMarks: exam.totalMarks - question.marks 
+      totalMarks: newTotal
     });
 
     return result;

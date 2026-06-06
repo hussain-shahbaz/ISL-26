@@ -80,7 +80,15 @@ class ExamService {
       }
     }
 
-    return await examRepository.updateById(id, data);
+    const result = await examRepository.updateById(id, data);
+
+    // questions fetch karo aur total recalculate karo
+    const questions = await questionRepository.findByExamId(id);
+    const newTotal = questions.reduce((sum, q) => sum + q.marks, 0);
+
+    await examRepository.updateById(id, { totalMarks: newTotal });
+
+    return result;
   }
 
   async updateStatus(id, newStatus) {
@@ -91,6 +99,12 @@ class ExamService {
 
     if (['submitted', 'checked'].includes(newStatus) && exam.status !== 'published' && !['submitted', 'checked'].includes(exam.status)) {
       throw new Error('Exam must be published first');
+    }
+
+    if (exam.status === 'published' && newStatus === ('draft' || 'saved')) {
+      if (new Date() >= new Date(exam.scheduledTime)) {
+        throw new Error('Cannot move to draft, exam has already started');
+      }
     }
 
     if (lockedStatuses.includes(exam.status) && !lockedStatuses.includes(newStatus)) {
