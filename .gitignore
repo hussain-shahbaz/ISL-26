@@ -1,14 +1,43 @@
-.env
-*.env
-*.log
-.DS_Store
-
+# Dependencies
 node_modules/
 **/node_modules/
 
-server/src/modules/.env
-server/src/modules/db.js
-server/src/modules/server.js
-server/src/modules/app.js
-server/src/modules/package-lock.json
-server/src/modules/node_modules/
+# Environment (never commit real secrets; keep .env.example)
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Logs
+*.log
+logs/
+**/logs/
+
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Build / dist
+dist/
+build/
+**/dist/
+**/build/
+
+# Vector store / runtime data
+**/cache/chroma/
+chroma_data/
+
+# Archives / misc
+*.zip
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
