@@ -1,0 +1,121 @@
+# =============================================================================
+# ExamPro - Secure Online Examination System
+# Distributed data layer. Application services are layered on top in later
+# stages. Run: docker compose up -d   (reads values from ./.env)
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL - relational source of truth (users, auth, exams, questions)
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: exampro-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-exampro}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-exampro}
+      POSTGRES_DB: ${POSTGRES_DB:-exampro}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-exampro} -d ${POSTGRES_DB:-exampro}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - exampro
+
+  # ---------------------------------------------------------------------------
+  # MongoDB - audit logs (hash chain), submissions, grading results
+  # ---------------------------------------------------------------------------
+  mongo:
+    image: mongo:7
+    container_name: exampro-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - exampro
+
+  # ---------------------------------------------------------------------------
+  # Redis - OTP, session cache, rate limiting, Celery broker, pub/sub
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: exampro-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - exampro
+
+  # ---------------------------------------------------------------------------
+  # Neo4j - graph analytics (collusion rings, shared devices, multi-session)
+  # ---------------------------------------------------------------------------
+  neo4j:
+    image: neo4j:5-community
+    container_name: exampro-neo4j
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-exampro-neo4j}
+      NEO4J_server_memory_pagecache_size: 256M
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - exampro
+
+  # ---------------------------------------------------------------------------
+  # ChromaDB - vector store for semantic plagiarism detection
+  # ---------------------------------------------------------------------------
+  chroma:
+    image: chromadb/chroma:0.5.20
+    container_name: exampro-chroma
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/v2/heartbeat || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - exampro
+
+volumes:
+  postgres_data:
+  mongo_data:
+  redis_data:
+  neo4j_data:
+  chroma_data:
+
+networks:
+  exampro:
+    driver: bridge
