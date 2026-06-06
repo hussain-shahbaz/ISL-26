@@ -157,7 +157,7 @@ async function runTests() {
   // Get exam by ID (this will likely fail since no real exam exists)
   await testRoute('GET', '/api/modules/exam/123456789012345678901234', null, 'Get Exam by ID');
   
-  // Get student exams
+  // Get student exams  
   await testRoute('GET', '/api/modules/exam/student', null, 'Get Student Exams');
   
   // Update exam (will likely fail)

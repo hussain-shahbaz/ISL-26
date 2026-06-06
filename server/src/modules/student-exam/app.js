@@ -5,6 +5,8 @@ class App {
     constructor() {
         this.app = express()
         this.app.use(express.json());
+        this.app.get('/health', (req, res) => res.status(200).json({ status: 'success', message: 'Student Exam service is healthy' }));
+        this.app.get('/api/v1/student-exam/health', (req, res) => res.status(200).json({ status: 'success', message: 'Student Exam service is healthy' }));
         this.app.use('/api/v1/student-exam', studentExamRoutes.getRouter());
     }
 

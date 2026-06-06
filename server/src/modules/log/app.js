@@ -1,6 +1,8 @@
 // Log microservice entry point - runs on port 3001
 
-require('dotenv').config();
+const path = require('path');
+// Load module-local env explicitly so `SERVICE_SECRET` is available
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 const express = require('express');
 const DatabaseConnection = require('./config/database');
 const logger = require('./utils/logger');

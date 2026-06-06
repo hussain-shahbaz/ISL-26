@@ -15,7 +15,7 @@ const loggerMiddleware = (req, res, next) => {
     const responseTime = Date.now() - requestStartTime;
     const service = req.get('x-service') || process.env.SERVICE_NAME || 'main-server';
     const environment = process.env.NODE_ENV || 'development';
-    const userId = req.get('x-user-id') || null;
+    const userId = req.get('x-user-id') || "";
     
 
     // Log REQUEST

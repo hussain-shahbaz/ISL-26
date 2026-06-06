@@ -91,5 +91,6 @@ module.exports = {
   },
 
   LOG_LEVEL: process.env.LOG_LEVEL || 'info',
-  GENESIS_MARKER : process.env.GENESIS
+  GENESIS_MARKER : process.env.GENESIS,
+  SERVICE_SECRET: process.env.SERVICE_SECRET || 'supersecretkey'
 };

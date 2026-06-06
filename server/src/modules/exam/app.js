@@ -10,7 +10,8 @@ class App {
       req.user = { userId: '101', role: 'student' };
       next();
     });
-    this.app.use('/health', (req, res) => res.status(200).json({ status: 'success', message: 'Exam module is healthy' }));
+    this.app.get('/health', (req, res) => res.status(200).json({ status: 'success', message: 'Exam module is healthy' }));
+    this.app.get('/api/exam/health', (req, res) => res.status(200).json({ status: 'success', message: 'Exam module is healthy' }));
     this.app.use('/api/exam', examRoutes.getRouter());
     this.app.use('/api/exam/question', questionRoutes.getRouter());
   }

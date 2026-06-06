@@ -16,6 +16,7 @@ const {
   handleValidationErrors,
 } = require('../validator/log.validator');
 
+
 router.use(serviceAuth.verify.bind(serviceAuth));
 router.post('/', validateCreateLog, handleValidationErrors, LogController.createLog);
 router.get('/health', LogController.healthCheck);

@@ -1,19 +1,15 @@
 // Main server - runs on port 3000, integrates all modules
 
 require('dotenv').config();
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 const express = require('express');
-const cookieParser =  require("cookie-parser");
+const cookieParser =  require('cookie-parser');
 const loggerMiddleware = require('./src/common/middleware/logger-middleware');
 const LogQueue = require('./src/common/queue/log-queue');
-const AttachAuth = require('../server/auth-service/src/app').default; // Import and attach auth service app
 const microserviceRoutes = require('./src/common/microservices/microservice-routes');
 
-const auth = require('./auth-service/src/app'); // Import auth service app for internal calls (if needed)
-
-
-
 const app = express();
-AttachAuth(app); // Attach auth service routes and middleware to main app
 const PORT = process.env.MAIN_SERVER_PORT || 3000;
 
 app.use(express.json());
@@ -59,13 +55,34 @@ app.use((err, req, res, next) => {
   });
 });
 
-const startServer = () => {
-  app.listen(PORT, () => {
-    console.log(`✅ Main server running at http://localhost:${PORT}`);
-    console.log(`📡 Log service URL: ${process.env.LOG_SERVICE_URL || 'http://localhost:3001'}`);
-    console.log(`📝 Logs are queued and sent non-blocking every 100ms`);
-  });
-};
+async function loadAuthService() {
+  const authServicePath = path.resolve(__dirname, 'auth-service/src/app.js');
+  const authModule = await import(pathToFileURL(authServicePath).href);
+  const AttachAuth = authModule.default || authModule;
+  if (typeof AttachAuth !== 'function') {
+    throw new Error('Auth service did not export a valid attach function');
+  }
+  await AttachAuth(app);
+}
+
+async function startServer() {
+  try {
+    await loadAuthService();
+
+    app.listen(PORT, () => {
+      console.log(`✅ Main server running at http://localhost:${PORT}`);
+      console.log('📌 Microservice proxy routes:');
+      console.log('   - /api/modules/exam/*');
+      console.log('   - /api/modules/student-exam/*');
+      console.log('   - /api/modules/grade-cheat/*');
+      console.log(`📡 Log service URL: ${process.env.LOG_SERVICE_URL || 'http://localhost:3001'}`);
+      console.log('📝 Logs are queued and sent non-blocking every 100ms');
+    });
+  } catch (error) {
+    console.error('Failed to start main server:', error);
+    process.exit(1);
+  }
+}
 
 startServer();
 

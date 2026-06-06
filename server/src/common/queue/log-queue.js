@@ -11,6 +11,7 @@ class LogQueue {
     this.isDraining = false;
     this.idleTimer = null;
     this.logServiceUrl = process.env.LOG_SERVICE_URL || 'http://localhost:3001/logs';
+    this.serviceSecret = process.env.SERVICE_SECRET || 'supersecretkey';
     this.startDrainer();
   }
 
@@ -62,11 +63,37 @@ class LogQueue {
     try {
       for (const log of logsToSend) {
         try {
-          await axios.post(this.logServiceUrl, log, {
+          const response = await axios.post(this.logServiceUrl, log, {
             timeout: 5000,
+            headers: {
+              'x-service-secret': this.serviceSecret,
+              'Content-Type': 'application/json'
+            }
           });
+
+          // Log non-2xx responses with full body for diagnostics
+          if (!response || response.status >= 400) {
+            console.error(`Log service responded with status=${response?.status}`);
+            try {
+              console.error('Response body:', JSON.stringify(response?.data, null, 2));
+            } catch (e) {
+              console.error('Response body (raw):', response?.data);
+            }
+            console.error('Original log payload:', JSON.stringify(log, null, 2));
+          }
         } catch (error) {
-          console.error(`Failed to send log to ${this.logServiceUrl}: ${error.message}`);
+          // Axios error — include response body when available for validation errors
+          if (error.response) {
+            console.error(`Failed to send log to ${this.logServiceUrl}: status=${error.response.status}`);
+            try {
+              console.error('Error response body:', JSON.stringify(error.response.data, null, 2));
+            } catch (e) {
+              console.error('Error response body (raw):', error.response.data);
+            }
+            console.error('Original log payload:', JSON.stringify(log, null, 2));
+          } else {
+            console.error(`Failed to send log to ${this.logServiceUrl}: ${error.message}`);
+          }
           // Optionally re-add to queue on failure
           // this.queue.push(log);
         }
