@@ -5,8 +5,21 @@ class App {
     constructor() {
         this.app = express()
         this.app.use(express.json());
-        this.app.get('/health', (req, res) => res.status(200).json({ status: 'success', message: 'Student Exam service is healthy' }));
-        this.app.get('/api/v1/student-exam/health', (req, res) => res.status(200).json({ status: 'success', message: 'Student Exam service is healthy' }));
+        // Identity is verified at the gateway and forwarded via x-user-* headers.
+        this.app.use((req, res, next) => {
+            req.user = {
+                userId: req.headers['x-user-id'],
+                role: req.headers['x-user-role'],
+                sessionId: req.headers['x-session-id'],
+                username: req.headers['x-username'],
+            };
+            next();
+        });
+        const health = (req, res) => res.status(200).json({
+            module: 'student-exam-service', status: 'healthy', dependencies: ['mongodb'], version: '1.0.0',
+        });
+        this.app.get('/health', health);
+        this.app.get('/api/v1/student-exam/health', health);
         this.app.use('/api/v1/student-exam', studentExamRoutes.getRouter());
     }
 

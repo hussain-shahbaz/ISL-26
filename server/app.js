@@ -16,6 +16,7 @@ const cookieParser = require('cookie-parser');
 const loggerMiddleware = require('./src/common/middleware/logger-middleware');
 const LogQueue = require('./src/common/queue/log-queue');
 const microserviceRoutes = require('./src/common/microservices/microservice-routes');
+const { authenticate } = require('./src/common/middleware/auth');
 
 const app = express();
 const PORT = process.env.GATEWAY_PORT || process.env.MAIN_SERVER_PORT || 3000;
@@ -94,8 +95,9 @@ async function startServer() {
   try {
     await loadAuthService();
 
-    // Reverse proxy: /api/modules/<service>/* -> microservice
-    app.use('/api/modules', microserviceRoutes.getRouter());
+    // Reverse proxy: /api/modules/<service>/* -> microservice.
+    // authenticate verifies the JWT once and propagates a trusted identity.
+    app.use('/api/modules', authenticate, microserviceRoutes.getRouter());
 
     // 404
     app.use((req, res) => {
