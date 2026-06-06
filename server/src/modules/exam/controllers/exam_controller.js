@@ -11,9 +11,8 @@ class ExamController {
     }
 
     req.body.instructorId = req.user.userId;
-
-    //yahan hum call lgaeingy aur teacher id ki base py unka name nikalwa leingy
-    req.body.teacherName = "Sir Nazeef"
+    // Teacher display name comes from the gateway-propagated identity.
+    req.body.teacherName = req.user.username || req.user.userId;
 
     const { isValid, errors } = examValidator.validateCreate(req.body);
     if (!isValid) return res.status(400).json({ status: 'error', errors });
@@ -53,9 +52,9 @@ class ExamController {
 
   async getExamsByStudent(req, res) {
     try {
-      // yahan py call lagygi aur rollNumber aayega student ki userId ki base py
-      const rollNumber = "roll-001"
-      const exams = await examService.getExamsByStudent(rollNumber);
+      // Students are enrolled and looked up by their canonical userId.
+      const studentId = req.user.userId;
+      const exams = await examService.getExamsByStudent(studentId);
       res.status(200).json({ status: 'success', data: exams });
     } catch (err) {
       res.status(400).json({ status: 'error', message: err.message });

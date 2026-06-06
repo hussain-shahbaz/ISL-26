@@ -32,7 +32,7 @@ class QuestionService {
       if (new Date() < new Date(exam.scheduledTime)) {
         throw new Error('Exam has not started yet');
       }
-      if (!exam.students.includes(user.rollNumber)) {
+      if (!exam.students.includes(user.userId)) {
         throw new Error('You are not allowed in this exam');
       }
     }else if(user.role === ROLES.TEACHER){
@@ -55,7 +55,8 @@ class QuestionService {
           status:        exam.status
         },
         questions: questions.map(q => {
-          const { referenceAnswer, ...safe } = q.toObject();
+          // findByExamId already returns lean plain objects.
+          const { referenceAnswer, ...safe } = q;
           return safe;
         })
       };
