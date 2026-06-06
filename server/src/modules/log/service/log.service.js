@@ -7,6 +7,21 @@ const logger = require('../utils/logger');
 const config = require('../config/config');
 
 class LogService {
+  // Single definition of the data covered by the hash chain. Used by both
+  // captureLog and verifyChainIntegrity so the two can never drift apart.
+  _hashPayload(log) {
+    return {
+      eventType: log.eventType,
+      requestId: log.requestId,
+      timestamp: new Date(log.timestamp).toISOString(),
+      service: log.service,
+      environment: log.environment,
+      request: log.request,
+      response: log.response,
+      error: log.error ?? null,
+    };
+  }
+
   async captureLog(logData) {
     try {
       const sanitized = {
@@ -26,17 +41,8 @@ class LogService {
         logData.environment
       );
 
-      // Extract log data (WITHOUT hash fields or metadata) for hashing
-      const logDataForHashing = {
-        eventType: sanitized.eventType,
-        requestId: sanitized.requestId,
-        timestamp: sanitized.timestamp.toISOString(), // Convert to consistent ISO string
-        service: sanitized.service,
-        environment: sanitized.environment,
-        request: sanitized.request,
-        response: sanitized.response,
-        error: sanitized.error,
-      };
+      // Data covered by the hash chain (excludes the hash fields themselves).
+      const logDataForHashing = this._hashPayload(sanitized);
 
       if (previousLog) {
         sanitized.previousHash = previousLog.currentHash;
@@ -233,12 +239,7 @@ class LogService {
 
         const isHashValid = verifyHash(
           currentLog.previousHash || '',
-          {
-            eventType: currentLog.eventType,
-            requestId: currentLog.requestId,
-            timestamp: currentLog.timestamp,
-            service: currentLog.service,
-          },
+          this._hashPayload(currentLog),
           currentLog.currentHash
         );
 

@@ -200,19 +200,19 @@ class LogRepository {
     }
   }
 
-//   async deleteOlderThan(days) {
-//     try {
-//       const cutoffDate = new Date();
-//       cutoffDate.setDate(cutoffDate.getDate() - days);
+  async deleteOlderThan(days) {
+    try {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - days);
 
-//       const result = await Log.deleteMany({ timestamp: { $lt: cutoffDate } });
-//       logger.info(`Deleted ${result.deletedCount} logs older than ${days} days`);
-//       return result;
-//     } catch (error) {
-//       logger.error('Failed to delete old logs', error);
-//       throw error;
-//     }
-//   }
+      const result = await Log.deleteMany({ timestamp: { $lt: cutoffDate } });
+      logger.info(`Deleted ${result.deletedCount} logs older than ${days} days`);
+      return result;
+    } catch (error) {
+      logger.error('Failed to delete old logs', error);
+      throw error;
+    }
+  }
 
   async getStats(service, options = {}) {
     try {
