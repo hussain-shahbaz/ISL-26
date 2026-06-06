@@ -122,50 +122,6 @@ class UserRepository {
       approvedBy,
     });
   }
-  // async getPendingInstructors() {
-  //   return prisma.userProfile.findMany({
-  //     where: {
-  //       role: "INSTRUCTOR",
-  //       approvalStatus: "PENDING",
-  //       isDeleted: false,
-  //     },
-  //     orderBy: {
-  //       createdAt: "desc",
-  //     },
-  //   });
-  // }
-  // async getAllInstructors() {
-  //   return prisma.userProfile.findMany({
-  //     where: {
-  //       role: "INSTRUCTOR",
-  //       isDeleted: false,
-  //     },
-
-  //     include: {
-  //       identifier: true,
-  //     },
-
-  //     orderBy: {
-  //       createdAt: "desc",
-  //     },
-  //   });
-  // }
-  // async getAllStudents() {
-  //   return prisma.userProfile.findMany({
-  //     where: {
-  //       role: "STUDENT",
-  //       isDeleted: false,
-  //     },
-
-  //     include: {
-  //       identifier: true,
-  //     },
-
-  //     orderBy: {
-  //       createdAt: "desc",
-  //     },
-  //   });
-  // }
   async rejectInstructor(instructorId, adminId) {
     return prisma.userProfile.update({
       where: {

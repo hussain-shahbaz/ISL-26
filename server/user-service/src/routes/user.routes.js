@@ -6,7 +6,7 @@ import { authorizeRoles } from "../middlewares/authMiddleware.js";
 import config from "../config/config.js";
 const userRouter = Router();
 userRouter.post("/register", internalOnly, userController.register);
-userRouter.delete("/users/:userId", userController.rollback);
+userRouter.delete("/:userId", internalOnly, userController.rollback);
 userRouter.get("/profile", authenticate, userController.getProfile);
 userRouter.patch(
   "/profile/complete",

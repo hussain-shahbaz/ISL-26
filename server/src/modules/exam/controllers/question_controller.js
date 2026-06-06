@@ -1,6 +1,5 @@
 const questionService   = require('../services/question_service');
 const questionValidator = require('../validators/question_validator');
-
 class QuestionController {
 
   async createQuestion(req, res) {
@@ -43,7 +42,6 @@ class QuestionController {
       res.status(404).json({ status: 'error', message: err.message });
     }
   }
-
   async updateQuestion(req, res) {
     const { isValid: idValid, errors: idErrors } = questionValidator.validateQuestionId(req.params.id);
     if (!idValid) return res.status(400).json({ status: 'error', errors: idErrors });

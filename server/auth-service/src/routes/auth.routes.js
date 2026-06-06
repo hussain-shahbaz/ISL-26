@@ -36,7 +36,7 @@ authRouter.post(
   controller.verifyEmail
 );
 // REFRESH TOKEN
-authRouter.post("/refresh", controller.refresh);
+authRouter.post("/refresh", authLimiter, controller.refresh);
 // CURRENT USER
 authRouter.get("/me", authMiddleware, controller.me);
 // USER SESSIONS
@@ -47,30 +47,35 @@ authRouter.post("/logout", authMiddleware, controller.logout);
 // REQUEST NEW EMAIL OTP
 authRouter.post(
   "/request-otp",
+  authLimiter,
   validate(requestOTPSchema),
   controller.requestNewOTP
 );
 // REQUEST RESET PASSWORD OTP
 authRouter.post(
   "/request-reset-password-otp",
+  authLimiter,
   validate(requestOTPSchema),
   controller.requestResetPasswordOTP
 );
 // FORGOT PASSWORD
 authRouter.post(
   "/forgot-password",
+  authLimiter,
   validate(forgotPasswordSchema),
   controller.forgotPassword
 );
 // VERIFY RESET OTP
 authRouter.post(
   "/verify-reset-otp",
+  authLimiter,
   validate(verifyResetOTPSchema),
   controller.verifyResetOTP
 );
 // RESET PASSWORD
 authRouter.post(
   "/reset-password",
+  authLimiter,
   validate(resetPasswordSchema),
   controller.resetPassword
 );

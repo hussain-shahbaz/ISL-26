@@ -11,40 +11,54 @@ const microserviceRoutes = require('./src/common/microservices/microservice-rout
 
 const app = express();
 const PORT = process.env.MAIN_SERVER_PORT || 3000;
-
+// import connectDB from "./auth-service/src/config/database.js";
+// await connectDB();
+// -------------------------
+// Global Middlewares
+// -------------------------
 app.use(express.json());
-app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
-
-// Request ID middleware (for tracking)
+app.use(cookieParser());
+// Request Id
 app.use((req, res, next) => {
-  req.requestId = req.get('x-request-id') || `req-${Date.now()}`;
+  req.requestId = req.get("x-request-id") || `req-${Date.now()}`;
   next();
 });
-
-// Logging middleware (captures REQUEST + RESPONSE)
-app.use(loggerMiddleware);
-
-// Health check
-app.get('/health', (req, res) => {
+// Logger
+// app.use(loggerMiddleware);
+// -------------------------
+// Health
+// -------------------------
+app.get("/health", (req, res) => {
   res.status(200).json({
     success: true,
-    message: 'Main server is healthy',
+    message: "Main server healthy",
     timestamp: new Date(),
     queueSize: LogQueue.size(),
   });
 });
+// -------------------------
+// Attach Auth Service
+// -------------------------
+const attachAuthService = async () => {
+  const { default: connectMongo } = await import(
+    "./auth-service/src/config/database.js"
+  );
+  const {  connectRedis } = await import(
+    "./auth-service/src/config/redis.js"
+  );
+  await connectMongo();
+  console.log("✅ MongoDB Connected");
+  await connectRedis();
+  console.log("✅ Redis Connected");
+  const { attachAuth } = await import("./auth-service/src/app.js");
+  attachAuth(app);
+  console.log("✅ Auth service attached");
+};
+// -------------------------
+// Start Server
+// -------------------------
 
-// Microservice routes - all microservices delegated through /api/modules/:service/*
-app.use('/api/modules', microserviceRoutes.getRouter());
-
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    error: 'Route not found',
-  });
-});
 
 // Error handler
 app.use((err, req, res, next) => {

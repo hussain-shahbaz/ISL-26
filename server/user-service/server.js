@@ -1,5 +1,10 @@
+import "dotenv/config";
 import app from "./src/app.js";
-const PORT =3001;
+import config from "./src/config/config.js";
+import { connectMongo } from "./src/config/mongo.js";
+const PORT = config.PORT;
+await connectMongo();
+
 app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
 });

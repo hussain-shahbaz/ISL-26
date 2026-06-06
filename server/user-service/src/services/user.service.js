@@ -94,14 +94,15 @@ class UserService {
 
   async getPendingUsers({ university, page, limit }) {
     return await userRepository.findUsers({
-      role: "INSTRUCTOR", // ← add this
+      role: "INSTRUCTOR",
       approvalStatus: "PENDING",
+      university,
       page,
       limit,
     });
   }
   async rejectInstructor(instructorId, adminId) {
-    const instructor = await userRepository.findById(instructorId);
+    const instructor = await userRepository.findProfileById(instructorId);
 
     if (!instructor) {
       throw new Error("Instructor not found");
@@ -115,7 +116,7 @@ class UserService {
       throw new Error("Instructor already rejected");
     }
 
-    return userRepo.rejectInstructor(instructorId, adminId);
+    return userRepository.rejectInstructor(instructorId, adminId);
   }
 }
 export default new UserService();

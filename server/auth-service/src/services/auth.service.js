@@ -6,7 +6,7 @@ import { EmailService } from "./email.service.js";
 import { VerificationRepository } from "../repositories/verification.repository.js";
 import { blacklistToken } from "../utils/jwt.js";
 import { generateOTP } from "../utils/otp.js";
-import crypt from "crypto";
+import crypto from "crypto";
 import {
   generateAccessToken,
   generateRefreshToken,
@@ -91,6 +91,7 @@ export class AuthService {
       role: user.role,
       sessionId,
       jti: crypto.randomUUID(),
+
     });
     const refreshToken = generateRefreshToken({
       userId: user.userId,
@@ -208,44 +209,6 @@ export class AuthService {
   async getSessions(userId) {
     return sessionRepo.getUserSessions(userId);
   }
-
-  //   if (!refreshToken) {
-  //     throw new Error("Refresh token is required");
-  //   }
-
-  //   let decoded;
-  //   try {
-  //     decoded = verifyRefreshToken(refreshToken);
-  //   } catch (e) {
-  //     throw new Error("Invalid refresh token");
-  //   }
-  //   const session = await sessionRepo.findActiveBySessionId(decoded.sessionId);
-  //   if (!session) {
-  //     throw new Error("Session not found or already logged out");
-  //   }
-  //   const matched = await compareHash(refreshToken, session.refreshTokenHash);
-  //   if (!matched) {
-  //     throw new Error("Invalid refresh token");
-  //   }
-  //   // Revoke the session
-  //   await sessionRepo.revoke(decoded.sessionId);
-  //   if (accessToken) {
-  //     try {
-  //       const decodedAccess = verifyAccessToken(accessToken); // decode it
-  //       await blacklistAccessToken(
-  //         decodedAccess.jti, // unique token id
-  //         decodedAccess.exp // expiry timestamp
-  //       );
-  //     } catch (e) {
-  //       // if access token already expired — no need to blacklist, ignore
-  //       console.warn("Access token invalid or expired, skipping blacklist");
-  //     }
-  //   }
-  //   return {
-  //     message: "Logged out successfully",
-  //   };
-  // }
-  // New: Logout from all devices
   async logout(refreshToken, jti, exp) {
     if (!refreshToken) {
       throw new Error("Refresh token is required");
@@ -270,8 +233,8 @@ export class AuthService {
     // ✅ Your existing logic
     await sessionRepo.revoke(decoded.sessionId);
 
-    // ✅ NEW — blacklist the access token jti
-    await blacklistToken(jti, "ACCESS", exp);
+    // Blacklist access token until its natural expiry
+    await blacklistToken(jti, exp);
     return { message: "Logged out successfully" };
   }
   async logoutAll(userId) {
@@ -485,7 +448,7 @@ export class AuthService {
     const passwordHash = await hashValue(body.password);
 
     // 7. update password in MongoDB
-    await authRepo.updatePassword(body.email, passwordHash);
+    await authRepo.updatePassword(user.userId, passwordHash);
 
     // 8. cleanup Redis
     await verificationRepo.deleteOTP("PASSWORD_RESET", body.email);

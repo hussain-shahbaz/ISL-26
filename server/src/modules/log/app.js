@@ -1,8 +1,6 @@
 // Log microservice entry point - runs on port 3001
 
-const path = require('path');
-// Load module-local env explicitly so `SERVICE_SECRET` is available
-require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+require('dotenv').config();
 const express = require('express');
 const DatabaseConnection = require('./config/database');
 const logger = require('./utils/logger');
@@ -48,7 +46,7 @@ const startServer = async () => {
 
     app.listen(PORT, () => {
       logger.info(`Log microservice running on port ${PORT}`);
-      console.log(`✅ Log service running at http://localhost:${PORT}`);
+      console.log(`✅ Log service running at http://localhost:${PORT}, LEVEL HAI`);
     });
   } catch (error) {
     logger.error(`Failed to start server: ${error.message}`);
