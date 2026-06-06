@@ -86,16 +86,27 @@ export class AuthService {
       );
     }
     const sessionId = uuid();
+    const deviceFingerprintHash = crypto
+      .createHash("sha256")
+      .update(meta.deviceFingerprint || "unknown")
+      .digest("hex");
+    // Shared JWT contract: user_id, username, role, session_id,
+    // device_fingerprint_hash. camelCase aliases kept for backward compat.
     const accessToken = generateAccessToken({
+      user_id: user.userId,
       userId: user.userId,
+      username: user.email,
       role: user.role,
+      session_id: sessionId,
       sessionId,
+      device_fingerprint_hash: deviceFingerprintHash,
       jti: crypto.randomUUID(),
-
     });
     const refreshToken = generateRefreshToken({
+      user_id: user.userId,
       userId: user.userId,
       role: user.role,
+      session_id: sessionId,
       sessionId,
     });
     const refreshTokenHash = await hashValue(refreshToken);
@@ -197,8 +208,11 @@ export class AuthService {
     if (!matched) throw new Error("Invalid refresh token");
     const user = await authRepo.findByUserId(decoded.userId);
     return generateAccessToken({
+      user_id: user.userId,
       userId: user.userId,
+      username: user.email,
       role: user.role,
+      session_id: session.sessionId,
       sessionId: session.sessionId,
       jti: crypto.randomUUID(),
     });
