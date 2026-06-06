@@ -10,8 +10,8 @@ class LogQueue {
     this.idleTimeoutMs = idleTimeoutMs;  // Time to wait before flushing if idle
     this.isDraining = false;
     this.idleTimer = null;
-    this.logServiceUrl = process.env.LOG_SERVICE_URL || 'http://localhost:3001/logs';
-    this.serviceSecret = process.env.SERVICE_SECRET || 'supersecretkey';
+    this.logServiceUrl = process.env.LOG_SERVICE_URL || 'http://localhost:3006/logs';
+    this.serviceSecret = process.env.SERVICE_SECRET || 'dev-service-secret';
     this.startDrainer();
   }
 

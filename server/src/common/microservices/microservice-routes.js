@@ -4,20 +4,21 @@ const axios = require('axios');
 class MicroserviceRoutes {
   constructor() {
     this.router = express.Router();
-    this.serviceSecret = process.env.X_SERVICE_SECRET || 'default-secret-key';
-    
-    // Microservice endpoints configuration
+    // Single shared service-to-service secret (see root .env.example).
+    this.serviceSecret = process.env.SERVICE_SECRET || 'dev-service-secret';
+
+    // Microservice endpoints configuration (normalized ports, env-driven).
     this.microservices = {
       exam: {
-        baseUrl: process.env.EXAM_SERVICE_URL || 'http://localhost:3002',
+        baseUrl: process.env.EXAM_SERVICE_URL || 'http://localhost:3003',
         baseApiPath: '/api/exam'
       },
       studentExam: {
-        baseUrl: process.env.STUDENT_EXAM_SERVICE_URL || 'http://localhost:3005',
+        baseUrl: process.env.STUDENT_EXAM_SERVICE_URL || 'http://localhost:3004',
         baseApiPath: '/api/v1/student-exam'
       },
       gradeCheat: {
-        baseUrl: process.env.GRADE_CHEAT_SERVICE_URL || 'http://localhost:3004',
+        baseUrl: process.env.GRADE_CHEAT_SERVICE_URL || 'http://localhost:3005',
         baseApiPath: '/api'
       }
     };
@@ -56,8 +57,10 @@ class MicroserviceRoutes {
           'content-type': 'application/json'
         };
 
-        // Remove host header to let axios set it correctly
+        // Strip hop-by-hop headers so axios recomputes them for the new body
         delete headers.host;
+        delete headers['content-length'];
+        delete headers.connection;
 
         // Make request to microservice
         const response = await axios({
