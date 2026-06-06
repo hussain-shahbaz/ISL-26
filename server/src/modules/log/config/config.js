@@ -1,13 +1,13 @@
 // Log module configuration - centralized settings and constants
 
 module.exports = {
-  PORT: process.env.LOG_SERVICE_PORT || 3001,
+  PORT: process.env.LOG_PORT || process.env.LOG_SERVICE_PORT || 3006,
   NODE_ENV: process.env.NODE_ENV || 'development',
   APP_NAME: process.env.APP_NAME || 'log-service',
 
   MONGODB: {
-    URI: process.env.MONGODB_URI || 'mongodb://localhost:27017/logs',
-    DB_NAME: process.env.MONGODB_DB_NAME || 'logs',
+    URI: process.env.MONGODB_URI || 'mongodb://localhost:27017',
+    DB_NAME: process.env.MONGODB_DB_LOGS || process.env.MONGODB_DB_NAME || 'exam_logs',
     TIMEOUT: 5000,
     POOL_SIZE: 10,
     RETRY_ATTEMPTS: 3,
@@ -91,6 +91,5 @@ module.exports = {
   },
 
   LOG_LEVEL: process.env.LOG_LEVEL || 'info',
-  GENESIS_MARKER : process.env.GENESIS,
-  SERVICE_SECRET: process.env.SERVICE_SECRET || 'supersecretkey'
+  SERVICE_SECRET: process.env.SERVICE_SECRET || 'dev-service-secret',
 };

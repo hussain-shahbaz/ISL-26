@@ -2,12 +2,13 @@
 
 require('dotenv').config();
 const express = require('express');
+const config = require('./config/config');
 const DatabaseConnection = require('./config/database');
 const logger = require('./utils/logger');
 const LogRoutes = require('./routes/log.routes');
 
 const app = express();
-const PORT = process.env.LOG_SERVICE_PORT || 3001;
+const PORT = config.PORT;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -15,10 +16,11 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/logs', LogRoutes);
 
 app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    success: true, 
-    message: 'Log microservice is healthy',
-    timestamp: new Date(),
+  res.status(200).json({
+    module: 'log-service',
+    status: 'healthy',
+    dependencies: ['mongodb'],
+    version: '1.0.0',
   });
 });
 

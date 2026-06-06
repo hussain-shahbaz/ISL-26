@@ -21,6 +21,7 @@ class Database {
       mongoose.set('strictQuery', true);
 
       const conn = await mongoose.connect(config.MONGODB.URI, {
+        dbName: config.MONGODB.DB_NAME,
         serverSelectionTimeoutMS: config.MONGODB.TIMEOUT,
         connectTimeoutMS: config.MONGODB.TIMEOUT,
         maxPoolSize: config.MONGODB.POOL_SIZE,
