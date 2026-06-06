@@ -122,7 +122,7 @@ async function startServer() {
 
     const server = app.listen(PORT, () => {
       console.log(`Gateway running at http://localhost:${PORT}`);
-      console.log('Proxy routes: /api/modules/{exam,student-exam,grade-cheat}/*');
+      console.log('Proxy routes: /api/modules/{user,exam,student-exam,grade-cheat,log}/*');
       console.log(`Log service: ${process.env.LOG_SERVICE_URL || 'http://localhost:3006/logs'}`);
     });
 
