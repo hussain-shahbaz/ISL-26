@@ -9,6 +9,10 @@ class MicroserviceRoutes {
 
     // Microservice endpoints configuration (normalized ports, env-driven).
     this.microservices = {
+      user: {
+        baseUrl: process.env.USER_SERVICE_URL || 'http://localhost:3002',
+        baseApiPath: '/api/users'
+      },
       exam: {
         baseUrl: process.env.EXAM_SERVICE_URL || 'http://localhost:3003',
         baseApiPath: '/api/exam'
@@ -20,6 +24,10 @@ class MicroserviceRoutes {
       gradeCheat: {
         baseUrl: process.env.GRADE_CHEAT_SERVICE_URL || 'http://localhost:3005',
         baseApiPath: '/api'
+      },
+      log: {
+        baseUrl: process.env.LOG_SERVICE_URL || 'http://localhost:3006',
+        baseApiPath: '/logs'
       }
     };
 
@@ -27,6 +35,9 @@ class MicroserviceRoutes {
   }
 
   _bindRoutes() {
+    // Route: /api/modules/user/*
+    this.router.use('/user', this._createProxyHandler(this.microservices.user));
+
     // Route: /api/modules/exam/*
     this.router.use('/exam', this._createProxyHandler(this.microservices.exam));
 
@@ -35,6 +46,9 @@ class MicroserviceRoutes {
 
     // Route: /api/modules/grade-cheat/*
     this.router.use('/grade-cheat', this._createProxyHandler(this.microservices.gradeCheat));
+
+    // Route: /api/modules/log/*
+    this.router.use('/log', this._createProxyHandler(this.microservices.log));
   }
 
   /**
