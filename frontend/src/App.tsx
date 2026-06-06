@@ -13,6 +13,9 @@ import ExamDetailPage from '@/pages/app/ExamDetail';
 import CreateExamPage from '@/pages/app/CreateExam';
 import SettingsPage from '@/pages/app/Settings';
 import ExamRunnerPage from '@/pages/app/ExamRunner';
+import ResultsPage from '@/pages/app/Results';
+import UsersPage from '@/pages/app/Users';
+import AuditPage from '@/pages/app/Audit';
 
 export default function App() {
   return (
@@ -52,6 +55,30 @@ export default function App() {
           }
         />
         <Route path="exams/:id" element={<ExamDetailPage />} />
+        <Route
+          path="results"
+          element={
+            <ProtectedRoute roles={['student']}>
+              <ResultsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="users"
+          element={
+            <ProtectedRoute roles={['admin']}>
+              <UsersPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="audit"
+          element={
+            <ProtectedRoute roles={['admin']}>
+              <AuditPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
 
