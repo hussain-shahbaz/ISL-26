@@ -2,9 +2,11 @@
 // Responsibilities: security headers, CORS, request id, async audit logging,
 // rate limiting, auth (in-process), and reverse-proxy to the microservices.
 
-require('dotenv').config();
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
+// Single source of truth: the repo-root .env (falls back to a local .env).
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+require('dotenv').config();
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');

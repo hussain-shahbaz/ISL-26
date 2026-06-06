@@ -8,9 +8,9 @@
     "start": "node app.js",
     "dev": "nodemon app.js",
     "health": "node scripts/check-microservices.js",
-    "log": "nodemon --env-file=src/modules/log/.env src/modules/log/app.js",
-    "exam": "nodemon --env-file=src/modules/exam/.env src/modules/exam/server.js",
-    "submission": "nodemon --env-file=src/modules/student-exam/.env src/modules/student-exam/server.js"
+    "log": "nodemon --env-file=../.env src/modules/log/app.js",
+    "exam": "nodemon --env-file=../.env src/modules/exam/server.js",
+    "submission": "nodemon --env-file=../.env src/modules/student-exam/server.js"
   },
   "keywords": [],
   "author": "",
