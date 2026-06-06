@@ -12,6 +12,7 @@ import ExamsListPage from '@/pages/app/ExamsList';
 import ExamDetailPage from '@/pages/app/ExamDetail';
 import CreateExamPage from '@/pages/app/CreateExam';
 import SettingsPage from '@/pages/app/Settings';
+import ExamRunnerPage from '@/pages/app/ExamRunner';
 
 export default function App() {
   return (
@@ -21,6 +22,16 @@ export default function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/verify-otp" element={<VerifyOtpPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+
+      {/* Full-screen proctored runner lives outside the app shell. */}
+      <Route
+        path="/app/exam/:examId/take"
+        element={
+          <ProtectedRoute roles={['student']}>
+            <ExamRunnerPage />
+          </ProtectedRoute>
+        }
+      />
 
       <Route
         path="/app"
