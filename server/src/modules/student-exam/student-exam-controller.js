@@ -5,28 +5,29 @@ class StudentExamController {
     async submitExam(req, res) {
         try {
             // manipulate this according to the request body
-            // const id = req.user.id; // from token
+            const id = req.user.id; // from token
             // const id = '101'; // for testing purpose, change it to above line when token is implemented
             // const id = '201'; // for testing purpose, change it to above line when token is implemented
-            const id = '301'; // for testing purpose, change it to above line when token is implemented
+            // const id = '301'; // for testing purpose, change it to above line when token is implemented
             const { examId } = req.params;
+            const { submissionTimeRaw } = req.query;
             const { answers } = req.body;
-            const submissionTime = new Date("2026-05-24T12:17:00.000Z");
-            const submissionData = {
-                studentId: id,
-                examId:examId,
-                answers:  answers.map(ans => {
-                        return {
-                            questionId: ans.question.questionId,
-                            submittedAnswer: ans.submittedAnswer
-                        }
-                        // 
-                    })
-                ,
-                submittedAt : new Date(submissionTime),
-            }
+            const submissionTime = new Date(submissionTimeRaw);
+            // const submissionData = {
+            //     studentId: id,
+            //     examId:examId,
+            //     answers:  answers.map(ans => {
+            //             return {
+            //                 questionId: ans.question.questionId,
+            //                 submittedAnswer: ans.submittedAnswer
+            //             }
+            //             // 
+            //         })
+            //     ,
+            //     submittedAt : new Date(submissionTime),
+            // }
 
-            
+
             const result = await studentExamService.submitExam(submissionData);
             console.log('controller: success')
             res.status(200).json({
@@ -42,35 +43,21 @@ class StudentExamController {
                 success: false,
                 error: error.message,
                 statusCode: 500,
-                data : {}
+                data: {}
             });
         }
 
 
-        // request attributes needed :
-            //  id(from token)
-            //  examId (from params)
-            //  answers (from body)
 
-        // checks:
-            // id is student    
-            // examId is valid
-            // exam is published
-            // exam is assigned to the student
-            // exam is not already submitted
-            // API hit time is before the exam end time (examDate + examTime + duration) and after the exam start time (examDate + examTime)
-
-        // response:
-            // success message
     }
 
     async getAllExams(req, res) {
         try {
-            // const id = req.user.id; // from token
-            const studentId = '101'; // for testing purpose, change it to above line when token is implemented
+            const id = req.user.id; // from token
+            // const studentId = '101'; // for testing purpose, change it to above line when token is implemented
             // const id = '201'; // for testing purpose, change it to above line when token is implemented
             // const id = '301'; // for testing purpose, change it to above line when token is implemented
-            const exams = await studentExamService.getAllExams(studentId);
+            const exams = await studentExamService.getAllExams(id);
             return res.status(200).json({
                 success: true,
                 message: 'Exams fetched successfully',
@@ -84,20 +71,21 @@ class StudentExamController {
                 success: false,
                 error: error.message,
                 statusCode: 500,
-                data : {}
+                data: {}
             })
         }
-         
+
     }
 
     async getExamDetails(req, res) {
         try {
-            // const id = req.user.id; // from token
-            const id = '101'; // for testing purpose, change it to above line when token is implemented
+            const id = req.user.id; // from token
+            // const id = '101'; // for testing purpose, change it to above line when token is implemented
             // const id = '201'; // for testing purpose, change it to above line when token is implemented
             // const id = '301'; // for testing purpose, change it to above line when token is implemented
             const { examId } = req.params;
-            const currentTime = new Date("2025-05-26T05:00:00.000Z"); // time of api hit
+            const { currentTimeRaw } = req.query;
+            const currentTime = new Date(currentTimeRaw); // time of api hit
             const examDetails = await studentExamService.getExamDetails(id, examId, currentTime);
             return res.status(200).json({
                 success: true,
@@ -112,7 +100,7 @@ class StudentExamController {
                 success: false,
                 error: error.message,
                 statusCode: 500,
-                data : {}
+                data: {}
             })
         }
     }
@@ -135,78 +123,10 @@ class StudentExamController {
                 success: false,
                 error: error.message,
                 statusCode: 500,
-                data : {}
+                data: {}
             })
         }
     }
 }
 
 module.exports = new StudentExamController();
-
-
- // request attributes needed :
-            //  id(from token)
-            // examId (from params)
-
-        // checks:
-            // id is student
-            // examId is valid
-            // exam is published
-            // exam is assigned to the student
-            // API hit time is before the exam end time (examDate + examTime + duration) and after the exam start time (examDate + examTime)
-    
-
-// getMyExams
-  
-
-
-// getExamDetails
-    
-
-    // call exam-module endpoint from service layer
-
-    // reposonse: 
-        // exam {
-        //     id,teacher,subject,examDate,examTime,duration,totalMarks,examType, examStatus
-        //     questions
-        // }
-
-
-// getExamResult
-    // request attributes needed :
-        //  id(from token)
-        //  examId (from params)
-    
-    // checks:
-        // id is student
-        // examId is valid
-        // exam is marked
-        // exam is assigned to the student
-        // API hit time is after the exam end time (examDate + examTime + duration)
-
-// submitExam
-
-
-// request attritubes needed :
-            //  id(from token)
-            //  (roll number, khud nikal lenge (cuz agar input lya to cehck bhi krna pre ga k apna hai ke nahi))
-            // 
-        // checks :
-            // get his user data
-            // check user exists
-            // check user is student
-        // filter : give exams that have his roll number in the array ... and are wither pusblished or sumbitted by student/marked by teacher
-        // call exam-module endpoint from service layer
-        // response attributes :
-            //  [
-            //      exam {
-                        // id,teacher,subject,examDate,examTime,duration,totalMarks,examType, examStatus
-                        // allow filters like teacher, subject, examType, date range etc
-            //      }
-            // ]
-        
-
-// bonus
-// askForRecheck
-
-
