@@ -1,8 +1,8 @@
+import "dotenv/config";
 import app from "./src/app.js";
+import config from "./src/config/config.js";
 import { connectMongo } from "./src/config/mongo.js";
-
-const PORT = 3001;
-
+const PORT = config.PORT;
 await connectMongo();
 
 app.listen(PORT, () => {

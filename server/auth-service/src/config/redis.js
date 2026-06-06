@@ -1,8 +1,11 @@
 import { createClient } from "redis";
+import config from "./config.js";
 const redisClient = createClient({
-  url:  "redis://localhost:6379",
+  url: config.REDIS_URL,
 });
 redisClient.on("error", (err) => console.error("Redis error:", err));
-redisClient.on("connect", () => console.log("Redis connected"));
-await redisClient.connect();
+export const connectRedis = async () => {
+  await redisClient.connect();
+  console.log("Redis connected");
+};
 export default redisClient;

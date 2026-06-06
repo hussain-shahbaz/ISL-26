@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import config from "../config/config.js";
 import blacklistRepository from "../repositories/blacklist.repository.js";
+import { isMongoReady } from "../config/mongo.js";
 
 export const authenticate = async (req, res, next) => {
   try {
@@ -22,7 +23,7 @@ export const authenticate = async (req, res, next) => {
 
     const decoded = jwt.verify(token, config.ACCESS_TOKEN_SECRET);
 
-    if (decoded.jti) {
+    if (decoded.jti && isMongoReady()) {
       const blacklisted = await blacklistRepository.isBlacklisted(decoded.jti);
       if (blacklisted) {
         return res.status(401).json({

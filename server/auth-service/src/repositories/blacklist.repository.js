@@ -1,7 +1,7 @@
 import Blacklist from "../models/blacklist.model.js";
 export class BlacklistRepository {
-  async add(jti, exp) {
-    const expiresAt = new Date(exp * 1000); // convert unix timestamp to Date
+  async add(jti, expUnixSeconds) {
+    const expiresAt = new Date(expUnixSeconds * 1000);
     await Blacklist.create({
       token: jti,
       type: "access",

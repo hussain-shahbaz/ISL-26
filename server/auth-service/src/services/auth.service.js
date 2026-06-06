@@ -91,7 +91,6 @@ export class AuthService {
       role: user.role,
       sessionId,
       jti: crypto.randomUUID(),
-     isCompleted: user.isProfileComplete,
 
     });
     const refreshToken = generateRefreshToken({

@@ -16,9 +16,8 @@ export const verifyAccessToken = async (token) => {
 export const verifyRefreshToken = (token) => {
   return jwt.verify(token, config.REFRESH_TOKEN_SECRET);
 };
-export const blacklistToken = async (jti, expiresInMs, type) => {
-  const expiresAt = new Date(Date.now() + expiresInMs);
-  await blacklistRepo.add(jti, type, expiresAt);
+export const blacklistToken = async (jti, expUnixSeconds) => {
+  await blacklistRepo.add(jti, expUnixSeconds);
 };
 export const isBlackListed = async (jti) => {
   return await blacklistRepo.isBlacklisted(jti);
