@@ -32,7 +32,7 @@ class ExamRepository {
   }
 
   async findById(id) {
-    return await Exam.findById(id);
+    return await Exam.findById(id).lean();
   }
 
   async findByIds(ids) {

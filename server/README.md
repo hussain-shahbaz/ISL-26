@@ -64,6 +64,47 @@ Done! 🎉
 - **Full Setup Guide**: See `INTEGRATION.md`
 - **Log Service API**: See `src/modules/log/README.md`
 - **Architecture Details**: See `src/modules/log/CONTEXT.md`
+- **Microservice Integration**: See `src/common/microservices/README.md`
+
+---
+
+## 🔌 Microservice Integration
+
+All microservices are now integrated through the main server with automatic proxy routing and logging.
+
+### Integrated Services
+
+| Service | Port | Route | Purpose |
+|---------|------|-------|---------|
+| **Exam** | 3002 | `/api/modules/exam/*` | Manage exams & questions |
+| **Student-Exam** | 3005 | `/api/modules/student-exam/*` | Track submissions |
+| **Grade-Cheat** | 3004 | `/api/modules/grade-cheat/*` | Grading & plagiarism |
+
+### Quick Test
+
+```bash
+# Get exams through main server
+curl http://localhost:3000/api/modules/exam/
+
+# Submit exam
+curl http://localhost:3000/api/modules/student-exam/
+
+# Check grading service
+curl http://localhost:3000/api/modules/grade-cheat/health
+```
+
+### How Microservice Requests Are Handled
+
+1. **Request arrives** at main server `/api/modules/exam/...`
+2. **Logger middleware** captures REQUEST (added to queue)
+3. **Proxy strips prefix** `/api/modules/` and forwards to microservice
+4. **x-service-secret header** automatically added from `.env`
+5. **Microservice response** received
+6. **Logger middleware** captures RESPONSE (added to queue)
+7. **Response returned** to client
+8. **Queue drains** every 100ms → Logs sent to Log Service
+
+**Key**: Microservice calls are automatically logged without blocking the main request!
 
 ---
 

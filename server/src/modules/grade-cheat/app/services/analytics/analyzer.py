@@ -49,7 +49,7 @@ class ExamAnalysisService:
 
             # Analyze per-question performance
             q_performance = defaultdict(lambda: {"correct": 0, "total": 0, "topic": "", "marks": 0})
-            q_mapping = {q["questionId"]: q for q in questions}
+            q_mapping = {q.get("_id") or q.get("id"): q for q in questions}
 
             for result in results:
                 for q_result in result.get("results", []):

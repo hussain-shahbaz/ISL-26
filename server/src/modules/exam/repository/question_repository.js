@@ -13,7 +13,7 @@ class QuestionRepository {
   }
 
   async findByExamId(examId) {
-    return await Question.find({ examId });
+    return await Question.find({ examId }).lean();
   }
 
   async findById(id) {
