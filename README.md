@@ -1,456 +1,127 @@
-# Secure Online Examination System
+# ExamPro — Secure Online Examination System
 
-This repository is built for a **modular, security-first, industry-style backend**.  
-The goal is not just to make the app work, but to make the code easy to maintain, test, review, and integrate as a team.
+A modular, security-first online examination platform built as a set of microservices behind an API gateway, backed by an intentional **distributed polyglot database** layer. It enforces academic integrity through authentication, RBAC, secure sessions, audit logging with tamper-evident hash chains, and AI-assisted grading and plagiarism detection.
 
----
-
-## 1) Project Idea
-
-We are building a secure online examination system where:
-
-- students log in securely
-- teachers manage and monitor exams
-- every important action is logged
-- the system follows a strict module-based structure
-- each team member works only in the module assigned to them
-
-This project is designed around a **clean layered architecture**:
-
-`Client -> Middleware -> Controller -> Service -> Repository -> Database`
-
-That means:
-
-- controllers handle requests and responses
-- services contain business rules
-- repositories talk to MongoDB
-- middleware handles cross-cutting concerns like auth, logging, validation, and response tracking
+> This is both an Information Security semester project and an Advanced Database Management System project. See `docs/PHASE1_AUDIT.md` for the full system audit and `docs/PHASE2_PLAN.md` for the target architecture and roadmap.
 
 ---
 
-## 2) Important Team Rule
+## Architecture
 
-Please **do not copy code blindly** from the sample module.
+```
+                       Browser (React + TypeScript SPA)
+                                    |
+                          API Gateway (Express, :3000)
+            JWT verify · reverse proxy · audit logging · CORS · rate limit
+                                    |
+   ┌──────────────┬──────────────┬──────────────┬───────────────┬──────────────┐
+   ▼              ▼              ▼              ▼               ▼              ▼
+ auth-service  user-service  exam-service  student-exam   grade-cheat     log-service
+   :3001          :3002         :3003         :3004        :3005 (Py)        :3006
+```
 
-The sample file is there to help you **understand the structure, naming style, and layering**, not to force exact logic.
+### Distributed polyglot persistence
 
-Use it as a learning guide, then write your own module in the same style.
+| Store | Purpose |
+|---|---|
+| **PostgreSQL** | Relational source of truth: users, auth identities, exams, questions, sessions |
+| **MongoDB** | Append-only / document data: audit logs (hash chain), submissions, grading results |
+| **Redis** | OTP, session cache, rate limiting, Celery broker, pub/sub |
+| **ChromaDB** | Vector store for semantic plagiarism detection |
+| **Neo4j** | Graph analytics: collusion rings, shared-device and multi-session detection |
+
+### Services & ports
+
+| Service | Tech | Port | Responsibility |
+|---|---|---|---|
+| Gateway | Node / Express | 3000 | Single entry point, proxy, auth, logging |
+| auth-service | Node / Express | 3001 | Register, OTP, login, JWT, sessions |
+| user-service | Node / Express | 3002 | Profiles, RBAC, admin approvals |
+| exam-service | Node / Express | 3003 | Exam & question authoring |
+| student-exam | Node / Express | 3004 | Submissions & results |
+| grade-cheat | Python / Flask + Celery | 3005 | LLM grading, plagiarism (TF-IDF + vector) |
+| log-service | Node / Express | 3006 | Tamper-evident audit logging |
 
 ---
 
-## 3) How We Work as a Team
+## Prerequisites
 
-Every person should work only inside their own assigned module folder.
-
-Examples:
-
-- if you are assigned authentication, work inside the auth module only
-- if you are assigned logging, work inside the logging module only
-- if you are assigned exam state, work inside the exam module only
-
-Do not modify another module unless the team agrees on a shared change.
-
-This keeps the codebase safe, clean, and easy to merge.
+- **Node.js 22 LTS** (Prisma requires 20.19+/22.12+/24.0+; avoid Node 23.x)
+- **Python 3.11+** (for the grade-cheat service)
+- **Docker + Docker Compose**
 
 ---
 
-## 4) Clone the Repository
+## Quick start
 
 ```bash
-git clone <repository-url>
-cd secure-online-examination-system
+# 1. Configure environment
+cp .env.example .env        # then fill in secrets (JWT_SECRET, SERVICE_SECRET, DB creds, API keys)
+
+# 2. Start the distributed database layer
+docker compose up -d        # Postgres, Mongo, Redis, Neo4j, Chroma
+
+# 3. Install and run services (during development)
+cd server && npm install
+npm run dev                 # gateway + auth on :3000
+npm run log                 # log-service on :3006
+npm run exam                # exam-service on :3003
+npm run submission          # student-exam on :3004
 ```
 
-After cloning, create your own working branch:
-
-```bash
-git checkout -b feature/module-name
-```
-
-Example:
-
-```bash
-git checkout -b feature/auth-module
-```
-
-When you finish, push your branch and create a pull request.
+> Full service containerization (one `docker compose up` for the entire stack) and the frontend are being added per `docs/PHASE2_PLAN.md`.
 
 ---
 
-## 5) Commit Message Style
-
-We follow **Conventional Commits** to keep our commit history clean and professional.
-
-### Format
-
-```
-<type>(<scope>): <subject>
-
-<body>
-
-<footer>
-```
-
-### Type
-Must be one of:
-
-- **feat** - A new feature
-- **fix** - A bug fix
-- **refactor** - Code refactoring (no feature change, no bug fix)
-- **docs** - Documentation changes only
-- **test** - Adding or updating tests
-- **chore** - Build scripts, dependencies, configuration
-- **style** - Code style changes (formatting, semicolons, etc.)
-- **perf** - Performance improvements
-
-### Scope
-The module or component affected (optional but recommended):
-
-- `auth`
-- `logging`
-- `exam`
-- `device`
-- `monitoring`
-- `risk`
-- `common`
-- `config`
-
-### Subject
-
-- Use imperative mood: "add" not "added" or "adds"
-- Do not capitalize first letter
-- Do not end with a period
-- Maximum 50 characters
-- Be specific and clear
-
-### Body (optional)
-
-- Explain WHY, not WHAT
-- Wrap at 72 characters
-- Use imperative mood
-- Reference issues if applicable
-
-### Footer (optional)
-
-- Reference related issues: `Closes #123` or `Fixes #456`
-- Breaking changes: `BREAKING CHANGE: description`
-
-### Examples
-
-**Good commits:**
-
-```
-feat(auth): add jwt token refresh mechanism
-
-implement automatic token refresh to prevent session
-expiry during active user sessions. uses refresh
-tokens stored in secure http-only cookies.
-
-Closes #42
-```
-
-```
-fix(logging): resolve missing userId in audit logs
-
-add userId extraction from request context before
-creating log entry to ensure all audit logs are
-properly attributed to users.
-```
-
-```
-refactor(auth): simplify token validation logic
-
-extract token validation into separate method for
-better testability and reusability across modules.
-```
-
-```
-docs(auth): add api documentation for login endpoint
-```
-
-```
-test(exam): add unit tests for exam-service
-```
-
-### Command to commit properly
-
-```bash
-git add .
-git commit -m "type(scope): subject" -m "Optional body with more details"
-```
-
-Or use your IDE's commit composer for interactive messages.
-
----
-
-## 7) Folder Structure
-
-We keep the backend organized by responsibility, not by random files.
+## Repository structure
 
 ```text
-server/
-├── src/
-│   ├── common/
-│   │   ├── middleware/
-│   │   ├── utils/
-│   │   ├── constants/
-│   │   └── helpers/
-│   │
-│   ├── modules/
-│   │   ├── auth/
-│   │   ├── logging/
-│   │   ├── exam/
-│   │   ├── device/
-│   │   ├── monitoring/
-│   │   └── risk/
-│   │
-│   ├── config/
-│   ├── routes/
-│   └── app.py
-│
-├── tests/
-├── docs/
-└── README.md
-```
-
-### What each folder means
-
-- `common/`  
-  shared logic used by all modules
-
-- `modules/`  
-  one folder per feature or security module
-
-- `config/`  
-  database, environment, and server settings
-
-- `routes/`  
-  central route registration
-
-- `tests/`  
-  unit and integration tests
-
-- `docs/`  
-  design notes, API notes, and module documentation
-
----
-
-## 8) Layering Rules
-
-These rules must stay strict:
-
-1. **Controller only receives request and returns response**
-2. **Service contains business logic**
-3. **Repository handles database access**
-4. **Middleware handles request/response cross-cutting work**
-5. **Lower layers must not depend on higher layers**
-6. **Controllers must not access MongoDB directly**
-7. **Services must not read raw HTTP requests**
-8. **Repositories must not contain business rules**
-9. **Modules must not import internal code from other modules**
-10. **All shared behavior should go through the common layer**
-
-This is the main rule set that keeps the system scalable.
-
----
-
-## 9) Naming Conventions
-
-We will use the same conventions everywhere.
-
-### Methods
-Use **camelCase**
-
-Examples:
-- `loginUser`
-- `validateRequest`
-- `logResponse`
-- `generateToken`
-
-### Classes
-Use **PascalCase**
-
-Examples:
-- `AuthController`
-- `AuthService`
-- `LoggingMiddleware`
-- `ExamRepository`
-
-### Constants
-Use **UPPER_CASE**
-
-Examples:
-- `JWT_SECRET`
-- `MAX_LOGIN_ATTEMPTS`
-- `DEFAULT_TIMEOUT`
-
-### Files
-Use **kebab-case**
-
-Examples:
-- `auth-controller.py`
-- `auth-service.py`
-- `response-logger.py`
-- `exam-repository.py`
-
----
-
-## 10) Request and Response Style
-
-We are keeping the payload style simple.
-
-### Example request body
-```json
-{
-  "username": "ali",
-  "password": "123456"
-}
-```
-
-### Example response body
-```json
-{
-  "status": "success",
-  "message": "Login successful",
-  "data": {
-    "username": "ali"
-  }
-}
-```
-
-### Example log object
-```json
-{
-  "userId": "123",
-  "timestamp": "2026-05-02T10:30:00Z",
-  "route": "/api/auth/login",
-  "request": {
-    "method": "POST",
-    "body": {
-      "username": "ali"
-    }
-  },
-  "response": {
-    "statusCode": 200
-  },
-  "payload": {
-    "action": "login"
-  },
-  "responseBody": {
-    "status": "success"
-  },
-  "sha256HASH": "..."
-}
+ISL-26/
+├── README.md                 # this file
+├── docker-compose.yml        # distributed database layer (+ services, in progress)
+├── .env.example              # single source of truth for configuration
+├── docs/                     # project-level docs (audit, plan, progress)
+├── frontend/                 # React + TypeScript SPA
+└── server/
+    ├── app.js                # API gateway
+    ├── auth-service/         # authentication (attached in-process to gateway)
+    ├── user-service/         # user profiles & RBAC
+    ├── docs/                 # server-level reference docs
+    └── src/
+        ├── common/           # gateway proxy, logging middleware, queue
+        └── modules/
+            ├── exam/         # exam authoring
+            ├── student-exam/ # submissions
+            ├── grade-cheat/  # grading & plagiarism (Python)
+            └── log/          # audit logging
 ```
 
 ---
 
-## 11) Logging Rule
+## Security model
 
-All modules must send logs through the shared logging flow.
-
-Do not write directly to the database from a module.
-
-Logging should capture:
-
-- `userId`
-- `timestamp`
-- `route`
-- `request`
-- `response`
-- `payload`
-- `responseBody`
-- `sha256HASH`
-
-This helps with auditing, debugging, and security tracking.
+- **Single shared JWT** (HS256) issued only by auth-service; verified across services.
+- **Service-to-service auth** via a shared `SERVICE_SECRET` header.
+- **RBAC** (student / teacher / admin) enforced on protected routes.
+- **Tamper-evident audit logs** via SHA-256 hash chaining in the log-service.
+- **Secret hygiene**: all secrets come from environment; nothing hardcoded.
 
 ---
 
-## 12) Response Logging
+## Contributing
 
-We want to understand both request and response flow.
+We follow **Conventional Commits**: `type(scope): subject`
 
-The middleware should:
+- Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `style`, `perf`
+- Imperative mood, lowercase subject, no trailing period
+- Keep commits small, meaningful, and scoped to one logical change
 
-- allow the controller to process the request
-- capture the final response
-- build a clean log object
-- send it to the logging module
-- never block the actual response
-
-That means logging should never break the user experience.
+**Layering rule (strict):** `Client → Middleware → Controller → Service → Repository → Database`. Controllers never touch the database directly; services hold business logic; repositories handle persistence; modules do not import another module's internals.
 
 ---
 
-## 13) Module Ownership Rule
+## Documentation
 
-Each teammate should focus on one module only.
-
-Example workflow:
-
-- Module owner designs the folder
-- Module owner writes controller, service, repository, and module-specific middleware
-- Shared utilities are added only when truly reusable
-- Any change that affects multiple modules must be discussed first
-
----
-
-## 14) What a Good Module Should Contain
-
-A proper module should have:
-
-- controller
-- service
-- repository
-- route file
-- validation logic
-- module-specific middleware if needed
-- test file
-- small README or notes if needed
-
-The module should stay self-contained as much as possible.
-
----
-
-## 15) What We Should Avoid
-
-- no giant controller files
-- no direct DB access inside controllers
-- no business logic inside routes
-- no copying logic into multiple modules
-- no hardcoded secrets
-- no random file naming
-- no inconsistent response formats
-
----
-
-## 16) Sample Design File
-
-A sample design skeleton is included in:
-
-`sample-module-skeleton.py`
-
-It shows:
-
-- class names
-- method names
-- return-shape examples
-- file naming style
-- module structure
-
-Again: **learn from it, do not copy it blindly**.
-
----
-
-## 17) Final Goal
-
-The final system should feel like a real team-built product:
-
-- readable
-- modular
-- secure
-- easy to debug
-- easy to integrate
-- easy to extend
-
-If a new teammate opens the codebase, they should understand where everything belongs within minutes.
+- `docs/PHASE1_AUDIT.md` — full as-is audit of the system
+- `docs/PHASE2_PLAN.md` — target architecture and execution roadmap
+- `server/docs/` — service integration, testing, and architecture references
