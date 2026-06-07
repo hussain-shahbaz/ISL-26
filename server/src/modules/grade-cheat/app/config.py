@@ -14,7 +14,7 @@ class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key")
     
     # Gemini
-    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AQ.Ab8RN6J1-3yofYRokc1PbxStqj0ndIIXE6QXGIy9LyUjY1TVuA")
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
     GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
     
     # MongoDB
