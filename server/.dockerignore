@@ -1,0 +1,14 @@
+**/node_modules
+**/.env
+**/.env.*
+!**/.env.example
+**/npm-debug.log
+**/__pycache__
+**/*.pyc
+**/.venv
+**/venv
+**/.pytest_cache
+**/.git
+**/coverage
+**/dist
+src/modules/grade-cheat

@@ -40,7 +40,14 @@ def _get_client() -> Optional[Any]:
     if not _HAS_CHROMA:
         return None
     if _chroma_client is None:
-        if getattr(Config, "CHROMA_MODE", "ephemeral") == "persistent":
+        mode = getattr(Config, "CHROMA_MODE", "ephemeral")
+        if mode == "http":
+            # Distributed: talk to a standalone ChromaDB server container.
+            host = getattr(Config, "CHROMA_HOST", "localhost")
+            port = getattr(Config, "CHROMA_PORT", 8000)
+            _chroma_client = chromadb.HttpClient(host=host, port=port)
+            logger.info("ChromaDB: HttpClient at %s:%s", host, port)
+        elif mode == "persistent":
             path = getattr(Config, "CHROMA_PATH", "./chroma_data")
             os.makedirs(path, exist_ok=True)
             _chroma_client = chromadb.PersistentClient(path=path)

@@ -79,8 +79,10 @@ class Config:
     TFIDF_WEIGHT = float(os.getenv("TFIDF_WEIGHT", "0.4"))
 
     # ChromaDB (semantic embeddings)
-    CHROMA_MODE = os.getenv("CHROMA_MODE", "ephemeral")  # ephemeral | persistent
+    CHROMA_MODE = os.getenv("CHROMA_MODE", "ephemeral")  # ephemeral | persistent | http
     CHROMA_PATH = os.getenv("CHROMA_PATH", "/tmp/chroma")
+    CHROMA_HOST = os.getenv("CHROMA_HOST", "localhost")
+    CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8000"))
 
     # When false, DataProvider can be extended to call external exam APIs
     USE_MOCK_DATA = os.getenv("USE_MOCK_DATA", "true").lower() == "true"

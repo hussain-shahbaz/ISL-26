@@ -10,7 +10,10 @@ class LogQueue {
     this.idleTimeoutMs = idleTimeoutMs;  // Time to wait before flushing if idle
     this.isDraining = false;
     this.idleTimer = null;
-    this.logServiceUrl = process.env.LOG_SERVICE_URL || 'http://localhost:3006/logs';
+    // LOG_SERVICE_URL is the service base (e.g. http://log:3006); logs are
+    // POSTed to its /logs route. Tolerate a value that already includes /logs.
+    const base = (process.env.LOG_SERVICE_URL || 'http://localhost:3006').replace(/\/+$/, '');
+    this.logServiceUrl = base.endsWith('/logs') ? base : `${base}/logs`;
     this.serviceSecret = process.env.SERVICE_SECRET || 'dev-service-secret';
     this.startDrainer();
   }
