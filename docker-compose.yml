@@ -191,6 +191,11 @@ services:
       mongo: { condition: service_healthy }
     expose:
       - "3003"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
     networks:
       - exampro
 
@@ -211,6 +216,11 @@ services:
       mongo: { condition: service_healthy }
     expose:
       - "3004"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3004/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
     networks:
       - exampro
 
@@ -230,6 +240,11 @@ services:
       mongo: { condition: service_healthy }
     expose:
       - "3006"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3006/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
     networks:
       - exampro
 
@@ -249,6 +264,11 @@ services:
       neo4j: { condition: service_healthy }
     expose:
       - "3007"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3007/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
     networks:
       - exampro
 
@@ -277,6 +297,11 @@ services:
       chroma: { condition: service_started }
     expose:
       - "3005"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3005/api/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
     networks:
       - exampro
 

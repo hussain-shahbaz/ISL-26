@@ -21,6 +21,27 @@ const { authenticate } = require('./src/common/middleware/auth');
 const app = express();
 const PORT = process.env.GATEWAY_PORT || process.env.MAIN_SERVER_PORT || 3000;
 
+// Fail fast in production if critical secrets are missing or left at a known
+// insecure default. This turns a silent security misconfiguration into a loud,
+// boot-time error. Development keeps working with the fallbacks.
+if (process.env.NODE_ENV === 'production') {
+  const isWeak = (v) => !v || /change-me|dev-service-secret|your[-_]/i.test(v);
+  const weak = Object.entries({
+    JWT_SECRET: process.env.JWT_SECRET || process.env.ACCESS_TOKEN_SECRET,
+    SERVICE_SECRET: process.env.SERVICE_SECRET,
+    INTERNAL_SECRET: process.env.INTERNAL_SECRET,
+  })
+    .filter(([, v]) => isWeak(v))
+    .map(([k]) => k);
+  if (weak.length) {
+    console.error(
+      `Refusing to start: missing or insecure default secret(s) in production: ${weak.join(', ')}. ` +
+        'Set strong values (e.g. `openssl rand -hex 32`).'
+    );
+    process.exit(1);
+  }
+}
+
 // -------------------------
 // Security & parsing
 // -------------------------

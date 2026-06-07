@@ -93,13 +93,15 @@ class MicroserviceRoutes {
         delete headers['content-length'];
         delete headers.connection;
 
-        // Make request to microservice
+        // Make request to microservice. A timeout prevents a hung downstream
+        // service from holding the gateway request open indefinitely.
         const response = await axios({
           method: req.method,
           url: targetUrl,
           data: req.method !== 'GET' && req.method !== 'HEAD' ? req.body : undefined,
           params: req.query,
           headers: headers,
+          timeout: Number(process.env.PROXY_TIMEOUT_MS) || 30000,
           validateStatus: () => true // Don't throw on any status code
         });
 
