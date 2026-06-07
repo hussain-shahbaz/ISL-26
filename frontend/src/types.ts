@@ -30,6 +30,9 @@ export interface Exam {
   students?: string[];
   status: ExamStatus;
   questions?: Question[];
+  // Per-student submission state (only present on the student exam list).
+  submitted?: boolean;
+  submittedAt?: string | null;
 }
 
 export interface SubmissionAnswer {

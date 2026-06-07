@@ -56,6 +56,12 @@ userRouter.post(
   authorizeRoles(config.ROLES.ADMIN, config.ROLES.INSTRUCTOR),
   userController.resolveStudents
 );
+userRouter.post(
+  "/students/resolve-ids",
+  authenticate,
+  authorizeRoles(config.ROLES.ADMIN, config.ROLES.INSTRUCTOR),
+  userController.resolveStudentIds
+);
 userRouter.patch(
   "/instructors/:id/reject",
   authenticate,

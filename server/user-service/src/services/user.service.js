@@ -83,6 +83,19 @@ class UserService {
     });
   }
 
+  // Resolve canonical student IDs (e.g. the IDs stored on an exam's roster) to
+  // human-readable identities for proctor reports. Returns only the matches.
+  async resolveStudentsByIds(ids) {
+    const users = await userRepository.findStudentsByIds(ids);
+    return users.map((u) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      rollNo: u.identifier?.identifier || null,
+      department: u.identifier?.department || null,
+    }));
+  }
+
   async resolveStudentsByEmails(emails) {
     const users = await userRepository.findStudentsByEmails(emails);
     const byEmail = new Map(users.map((u) => [u.email.trim(), u]));

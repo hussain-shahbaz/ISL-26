@@ -14,6 +14,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { getStudentExamDetails, submitExam } from '@/features/exams/api';
+import { examWindow } from '@/features/exams/status';
 import { useProctoring, type Violation } from '@/features/exams/useProctoring';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/input';
@@ -23,7 +24,7 @@ import { ErrorState } from '@/components/app/widgets';
 import { Logo } from '@/components/brand/Logo';
 import { toast } from '@/store/toast';
 import { apiErrorMessage } from '@/lib/api';
-import { formatCountdown, cn } from '@/lib/utils';
+import { formatCountdown, formatDate, cn } from '@/lib/utils';
 
 const MAX_VIOLATIONS = 5;
 
@@ -56,7 +57,7 @@ export default function ExamRunnerPage() {
   const questions = exam?.questions ?? [];
 
   const doSubmit = useCallback(
-    async (reason?: string) => {
+    async (reason?: string, opts?: { terminal?: boolean }) => {
       if (submittedRef.current) return;
       submittedRef.current = true;
       setSubmitting(true);
@@ -76,6 +77,15 @@ export default function ExamRunnerPage() {
         toast.success('Exam submitted', reason || 'Your answers were recorded securely.');
         navigate('/app/results', { replace: true });
       } catch (err) {
+        // Terminal submits (time-up / auto-submit / closed window) must NOT loop:
+        // keep submittedRef pinned, surface one message, and leave the exam.
+        if (opts?.terminal) {
+          localStorage.removeItem(storageKey);
+          if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+          toast.error('Exam closed', apiErrorMessage(err, 'The submission window has ended.'));
+          navigate('/app/results', { replace: true });
+          return;
+        }
         submittedRef.current = false;
         toast.error('Submission failed', apiErrorMessage(err));
       } finally {
@@ -111,15 +121,20 @@ export default function ExamRunnerPage() {
     if (!started || !exam) return;
     const start = new Date(exam.scheduledTime).getTime();
     const end = start + exam.timeAllowed * 60 * 1000;
+    let stopped = false;
+    let id: ReturnType<typeof setInterval>;
     const tick = () => {
       const remaining = Math.floor((end - Date.now()) / 1000);
       setSecondsLeft(remaining);
-      if (remaining <= 0) {
-        void doSubmit('Time is up. Your answers were submitted automatically.');
+      if (remaining <= 0 && !stopped) {
+        // Submit exactly once at expiry; never poll-retry (which flooded toasts).
+        stopped = true;
+        clearInterval(id);
+        void doSubmit('Time is up. Your answers were submitted automatically.', { terminal: true });
       }
     };
     tick();
-    const id = setInterval(tick, 1000);
+    id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [started, exam, doSubmit]);
 
@@ -144,6 +159,33 @@ export default function ExamRunnerPage() {
       <div className="grid min-h-screen place-items-center bg-background px-6">
         <div className="w-full max-w-md text-center">
           <ErrorState message={apiErrorMessage(error, 'This exam is not available right now.')} />
+          <Button className="mt-5" variant="outline" onClick={() => navigate('/app/exams')}>
+            Back to exams
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Hard gate on the exam window. Entering a closed exam previously triggered an
+  // immediate auto-submit that failed server-side and looped error toasts.
+  const win = examWindow(exam);
+  if (win.ended || !win.started) {
+    const end = new Date(win.end);
+    return (
+      <div className="grid min-h-screen place-items-center bg-background px-6">
+        <div className="w-full max-w-md text-center">
+          <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl border border-border bg-surface">
+            <Lock size={24} className={win.ended ? 'text-risk' : 'text-exam'} />
+          </div>
+          <h1 className="text-xl font-semibold">
+            {win.ended ? 'This exam has closed' : 'This exam has not opened yet'}
+          </h1>
+          <p className="mt-2 text-sm text-muted">
+            {win.ended
+              ? `The submission window ended on ${formatDate(end.toISOString())}. You can no longer enter this exam.`
+              : `The exam opens at ${formatDate(exam.scheduledTime)}. Please come back then.`}
+          </p>
           <Button className="mt-5" variant="outline" onClick={() => navigate('/app/exams')}>
             Back to exams
           </Button>

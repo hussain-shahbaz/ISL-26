@@ -9,18 +9,14 @@ import {
   Trash2,
   Play,
   ShieldCheck,
-  ShieldAlert,
+  CheckCircle2,
+  Lock,
   ArrowLeft,
-  Eye,
 } from 'lucide-react';
-import {
-  getExam,
-  updateExamStatus,
-  deleteExam,
-  getExamSubmissions,
-  type Submission,
-} from '@/features/exams/api';
-import { PageHeader, ErrorState, Skeleton, EmptyState } from '@/components/app/widgets';
+import { getExam, updateExamStatus, deleteExam } from '@/features/exams/api';
+import { ProctorReport } from '@/features/exams/ProctorReport';
+import { studentExamState, STUDENT_STATE_LABEL, STUDENT_STATE_TONE } from '@/features/exams/status';
+import { PageHeader, ErrorState, Skeleton } from '@/components/app/widgets';
 import { ExamStatusBadge } from '@/features/exams/components';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -74,6 +70,8 @@ export default function ExamDetailPage() {
   }
   if (isError || !exam) return <ErrorState />;
 
+  const studentState = !isTeacher ? studentExamState(exam) : null;
+
   const meta = [
     { icon: CalendarClock, label: 'Scheduled', value: exam.scheduledTime ? formatDate(exam.scheduledTime) : 'TBA' },
     { icon: Clock, label: 'Duration', value: `${exam.timeAllowed} min` },
@@ -107,12 +105,18 @@ export default function ExamDetailPage() {
                 </Button>
               )}
             </div>
-          ) : exam.status === 'published' ? (
+          ) : studentState === 'open' ? (
             <Button onClick={() => navigate(`/app/exam/${exam._id}/take`)}>
               <Play size={16} /> Enter exam
             </Button>
+          ) : studentState === 'submitted' ? (
+            <Button variant="outline" onClick={() => navigate('/app/results')}>
+              <CheckCircle2 size={16} /> View result
+            </Button>
           ) : (
-            <ExamStatusBadge status={exam.status} />
+            <Badge tone={STUDENT_STATE_TONE[studentState ?? 'unavailable']}>
+              {STUDENT_STATE_LABEL[studentState ?? 'unavailable']}
+            </Badge>
           )
         }
       />
@@ -138,7 +142,7 @@ export default function ExamDetailPage() {
         ))}
       </div>
 
-      {!isTeacher && exam.status === 'published' && (
+      {!isTeacher && studentState === 'open' && (
         <Card className="mt-6 border-brand/30">
           <CardContent className="flex flex-col items-start gap-3 p-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
@@ -157,7 +161,50 @@ export default function ExamDetailPage() {
         </Card>
       )}
 
-      {isTeacher && <ProctorReport examId={id} />}
+      {!isTeacher && studentState === 'submitted' && (
+        <Card className="mt-6 border-integrity/30">
+          <CardContent className="flex flex-col items-start gap-3 p-6 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 size={22} className="text-integrity" />
+              <div>
+                <p className="font-medium">You've submitted this exam</p>
+                <p className="text-sm text-muted">
+                  {exam.submittedAt
+                    ? `Submitted on ${formatDate(exam.submittedAt)}. Grades appear once your teacher releases them.`
+                    : 'Your answers were recorded. Grades appear once your teacher releases them.'}
+                </p>
+              </div>
+            </div>
+            <Button variant="outline" onClick={() => navigate('/app/results')}>
+              View results
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {!isTeacher && (studentState === 'closed' || studentState === 'upcoming') && (
+        <Card className="mt-6">
+          <CardContent className="flex items-center gap-3 p-6">
+            {studentState === 'closed' ? (
+              <Lock size={22} className="text-risk" />
+            ) : (
+              <Clock size={22} className="text-exam" />
+            )}
+            <div>
+              <p className="font-medium">
+                {studentState === 'closed' ? 'This exam has closed' : 'This exam has not opened yet'}
+              </p>
+              <p className="text-sm text-muted">
+                {studentState === 'closed'
+                  ? 'The submission window has ended. You can no longer enter this exam.'
+                  : `The exam opens at ${formatDate(exam.scheduledTime)}.`}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {isTeacher && <ProctorReport exam={exam} />}
 
       {isTeacher && exam.questions && exam.questions.length > 0 && (
         <section className="mt-8">
@@ -197,98 +244,3 @@ export default function ExamDetailPage() {
   );
 }
 
-const VIOLATION_LABELS: Record<string, string> = {
-  'tab-hidden': 'Tab switch',
-  'focus-lost': 'Focus lost',
-  'fullscreen-exit': 'Fullscreen exit',
-  clipboard: 'Copy / paste',
-  'context-menu': 'Right-click',
-  'devtools-keys': 'Shortcut',
-};
-
-function riskTone(count: number): 'integrity' | 'proctor' | 'risk' {
-  if (count === 0) return 'integrity';
-  if (count <= 2) return 'proctor';
-  return 'risk';
-}
-
-function ProctorReport({ examId }: { examId: string }) {
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['exam-submissions', examId],
-    queryFn: () => getExamSubmissions(examId),
-    enabled: Boolean(examId),
-  });
-
-  const submissions: Submission[] = data ?? [];
-  const totalViolations = submissions.reduce((acc, s) => acc + (s.violationCount ?? 0), 0);
-  const flagged = submissions.filter((s) => (s.violationCount ?? 0) > 0).length;
-
-  return (
-    <section className="mt-8">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 text-lg font-semibold">
-          <Eye size={18} className="text-brand" /> Proctor report
-        </h2>
-        {submissions.length > 0 && (
-          <div className="flex items-center gap-2 text-xs">
-            <Badge tone="exam">{submissions.length} submitted</Badge>
-            <Badge tone={flagged ? 'risk' : 'integrity'}>{flagged} flagged</Badge>
-            <Badge tone={totalViolations ? 'proctor' : 'integrity'}>{totalViolations} violations</Badge>
-          </div>
-        )}
-      </div>
-
-      {isLoading ? (
-        <Skeleton className="h-40" />
-      ) : isError ? (
-        <ErrorState message="Could not load submissions." />
-      ) : submissions.length === 0 ? (
-        <EmptyState
-          title="No submissions yet"
-          description="Integrity telemetry appears here as students submit."
-          icon={ShieldCheck}
-        />
-      ) : (
-        <div className="space-y-2">
-          {submissions.map((s) => {
-            const count = s.violationCount ?? 0;
-            const breakdown = (s.violations ?? []).reduce<Record<string, number>>((acc, v) => {
-              acc[v.type] = (acc[v.type] ?? 0) + 1;
-              return acc;
-            }, {});
-            return (
-              <Card key={s._id}>
-                <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-2 p-4">
-                  <span className={count > 2 ? 'text-risk' : count > 0 ? 'text-proctor' : 'text-integrity'}>
-                    {count > 0 ? <ShieldAlert size={16} /> : <ShieldCheck size={16} />}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-mono text-xs text-foreground" title={s.studentId}>
-                      {s.studentId}
-                    </p>
-                    <p className="text-xs text-muted">
-                      Submitted {formatDate(s.submittedAt)} · {s.status === 'graded' ? 'Graded' : 'Pending grading'}
-                    </p>
-                  </div>
-                  {Object.keys(breakdown).length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {Object.entries(breakdown).map(([type, n]) => (
-                        <span
-                          key={type}
-                          className="rounded-md border border-border bg-surface-2/50 px-2 py-0.5 text-[11px] text-muted"
-                        >
-                          {VIOLATION_LABELS[type] ?? type} ×{n}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  <Badge tone={riskTone(count)}>{count} alerts</Badge>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-    </section>
-  );
-}

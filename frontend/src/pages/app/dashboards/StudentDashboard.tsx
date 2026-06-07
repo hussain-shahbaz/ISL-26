@@ -11,6 +11,7 @@ import {
   DistributionBar,
 } from '@/components/app/widgets';
 import { ExamCard } from '@/features/exams/components';
+import { studentExamState } from '@/features/exams/status';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/auth';
@@ -24,11 +25,11 @@ export default function StudentDashboard() {
   });
 
   const list = exams ?? [];
-  const upcoming = list.filter((e) => e.status === 'published');
-  const submitted = list.filter((e) => e.status === 'submitted');
-  const graded = list.filter((e) => e.status === 'checked');
-  const completed = [...submitted, ...graded];
-  const nextUp = [...upcoming].sort(
+  // "Open" = live and not yet submitted; the only state that may be entered.
+  const open = list.filter((e) => studentExamState(e) === 'open');
+  const upcomingList = list.filter((e) => studentExamState(e) === 'upcoming');
+  const submitted = list.filter((e) => studentExamState(e) === 'submitted');
+  const nextUp = [...open, ...upcomingList].sort(
     (a, b) => new Date(a.scheduledTime).getTime() - new Date(b.scheduledTime).getTime(),
   )[0];
 
@@ -41,18 +42,18 @@ export default function StudentDashboard() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Assigned" value={list.length} icon={FileText} accent="brand" />
-        <StatCard label="Open now" value={upcoming.length} icon={Clock} accent="exam" delay={0.05} />
-        <StatCard label="Submitted" value={completed.length} icon={CheckCircle2} accent="proctor" delay={0.1} />
-        <StatCard label="Graded" value={graded.length} icon={Trophy} accent="integrity" delay={0.15} />
+        <StatCard label="Open now" value={open.length} icon={Clock} accent="exam" delay={0.05} />
+        <StatCard label="Submitted" value={submitted.length} icon={CheckCircle2} accent="proctor" delay={0.1} />
+        <StatCard label="Upcoming" value={upcomingList.length} icon={Trophy} accent="integrity" delay={0.15} />
       </div>
 
       <div className="mt-8 grid gap-4 lg:grid-cols-[1fr_1.2fr]">
         <DistributionBar
           title="Your progress"
           segments={[
-            { label: 'Open', value: upcoming.length, tone: 'exam' },
+            { label: 'Open', value: open.length, tone: 'exam' },
             { label: 'Submitted', value: submitted.length, tone: 'proctor' },
-            { label: 'Graded', value: graded.length, tone: 'integrity' },
+            { label: 'Upcoming', value: upcomingList.length, tone: 'integrity' },
           ]}
         />
         <Card className={nextUp ? 'border-brand/30' : undefined}>
@@ -87,16 +88,16 @@ export default function StudentDashboard() {
           <CardGridSkeleton />
         ) : isError ? (
           <ErrorState />
-        ) : upcoming.length === 0 ? (
+        ) : open.length === 0 ? (
           <EmptyState
             title="No open exams"
-            description="When a teacher publishes an exam assigned to you, it will appear here."
+            description="When a teacher publishes an exam assigned to you and its window opens, it will appear here."
             icon={FileText}
           />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {upcoming.map((exam, i) => (
-              <ExamCard key={exam._id} exam={exam} to={`/app/exams/${exam._id}`} cta="Start" delay={i * 0.05} />
+            {open.map((exam, i) => (
+              <ExamCard key={exam._id} exam={exam} to={`/app/exams/${exam._id}`} studentView delay={i * 0.05} />
             ))}
           </div>
         )}

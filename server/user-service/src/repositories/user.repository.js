@@ -101,6 +101,18 @@ class UserRepository {
       },
     });
   }
+
+  async findStudentsByIds(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) return [];
+    return await prisma.userProfile.findMany({
+      where: {
+        isDeleted: false,
+        role: "STUDENT",
+        id: { in: ids },
+      },
+      include: { identifier: true },
+    });
+  }
   async updateApprovalStatus(userId, { status, approvedBy }) {
     return await prisma.userProfile.update({
       where: { id: userId },

@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Award, Clock3, CheckCircle2 } from 'lucide-react';
 import { listStudentExams } from '@/features/exams/api';
 import { PageHeader, EmptyState, ErrorState, CardGridSkeleton } from '@/components/app/widgets';
-import { ExamStatusBadge } from '@/features/exams/components';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatDate } from '@/lib/utils';
 
@@ -12,7 +12,9 @@ export default function ResultsPage() {
     queryFn: listStudentExams,
   });
 
-  const completed = (data ?? []).filter((e) => e.status === 'submitted' || e.status === 'checked');
+  // A result exists once the student has actually submitted — derived from the
+  // per-student `submitted` flag, not the exam's global status.
+  const completed = (data ?? []).filter((e) => e.submitted || e.status === 'checked');
 
   return (
     <div>
@@ -51,11 +53,15 @@ export default function ResultsPage() {
                     <p className="text-muted">
                       {exam.status === 'checked' ? 'Graded' : 'Awaiting grading'}
                     </p>
-                    {exam.scheduledTime && (
-                      <p className="text-xs text-muted">{formatDate(exam.scheduledTime, { dateStyle: 'medium', timeStyle: undefined })}</p>
+                    {exam.submittedAt && (
+                      <p className="text-xs text-muted">
+                        Submitted {formatDate(exam.submittedAt, { dateStyle: 'medium', timeStyle: 'short' })}
+                      </p>
                     )}
                   </div>
-                  <ExamStatusBadge status={exam.status} />
+                  <Badge tone={exam.status === 'checked' ? 'integrity' : 'proctor'}>
+                    {exam.status === 'checked' ? 'Graded' : 'Submitted'}
+                  </Badge>
                 </div>
               </CardContent>
             </Card>

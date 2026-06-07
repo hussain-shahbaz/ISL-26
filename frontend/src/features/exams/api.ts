@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { api, unwrap } from '@/lib/api';
 import type { Exam, SubmissionAnswer } from '@/types';
 
@@ -123,4 +124,117 @@ export async function getExamSubmissions(examId: string): Promise<Submission[]> 
   const data = unwrap<Submission[] | Submission | null>(res.data);
   if (!data) return [];
   return Array.isArray(data) ? data : [data];
+}
+
+export interface StudentIdentity {
+  id: string;
+  name: string;
+  email: string;
+  rollNo?: string | null;
+  department?: string | null;
+}
+
+// Teacher/admin: turn a list of student IDs (e.g. from a proctor report) into
+// human identities so the UI never has to render raw UUIDs.
+export async function resolveStudentsByIds(ids: string[]): Promise<StudentIdentity[]> {
+  if (ids.length === 0) return [];
+  const res = await api.post(`${MODULES}/user/students/resolve-ids`, { ids });
+  return unwrap<{ students: StudentIdentity[] }>(res.data)?.students ?? [];
+}
+
+// ---- Grading (grade-cheat service) ----
+
+export type GradingMode = 'strict' | 'medium' | 'lenient';
+
+export interface QuestionResult {
+  questionId: string;
+  score: number;
+  maxMarks: number;
+  isCorrect?: boolean;
+  feedback?: string;
+  reasoning?: string;
+  cheatingScore?: number;
+  cheatingFlag?: boolean;
+}
+
+export interface StudentResult {
+  examId: string;
+  studentId: string;
+  totalScore: number;
+  totalMarks: number;
+  percentage: number;
+  gradingMode?: string;
+  gradedAt?: string;
+  results: QuestionResult[];
+}
+
+export interface GradingProgress {
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  progress?: { completed?: number; total?: number };
+  elapsed?: number;
+  error?: string;
+}
+
+// Returns stored per-student results, or [] if the exam hasn't been graded yet
+// (the service answers 404 in that case — not an error for our purposes).
+export async function getGradingResults(examId: string): Promise<StudentResult[]> {
+  try {
+    const res = await api.get(`${MODULES}/grade-cheat/results`, { params: { examId } });
+    return unwrap<{ results: StudentResult[] }>(res.data)?.results ?? [];
+  } catch (err) {
+    if (axios.isAxiosError(err) && err.response?.status === 404) return [];
+    throw err;
+  }
+}
+
+export interface StartGradingResult {
+  taskId?: string;
+  alreadyGraded?: boolean;
+  alreadyRunning?: boolean;
+}
+
+// Kick off grading. Treats "already graded" (409) as a non-error so the caller
+// can simply refetch results.
+export async function startGrading(
+  examId: string,
+  mode: GradingMode = 'medium',
+): Promise<StartGradingResult> {
+  try {
+    const res = await api.post(`${MODULES}/grade-cheat/grade/async`, null, {
+      params: { examId, mode },
+    });
+    const data = res.data as { taskId?: string };
+    return { taskId: data?.taskId };
+  } catch (err) {
+    if (axios.isAxiosError(err) && err.response?.status === 409) {
+      const data = err.response.data as { taskId?: string; error?: string };
+      const running = /running/i.test(data?.error || '');
+      return { taskId: data?.taskId, alreadyGraded: !running, alreadyRunning: running };
+    }
+    throw err;
+  }
+}
+
+export async function getGradingProgress(taskId: string): Promise<GradingProgress> {
+  const res = await api.get(`${MODULES}/grade-cheat/grade/progress`, { params: { taskId } });
+  return res.data as GradingProgress;
+}
+
+export interface ExamAnalytics {
+  averageScore?: number;
+  averagePercentage?: number;
+  highestScore?: number;
+  lowestScore?: number;
+  totalStudents?: number;
+  flaggedCount?: number;
+}
+
+export async function getExamAnalytics(examId: string): Promise<ExamAnalytics | null> {
+  try {
+    const res = await api.get(`${MODULES}/grade-cheat/analytics`, { params: { examId } });
+    return unwrap<ExamAnalytics>(res.data) ?? null;
+  } catch (err) {
+    if (axios.isAxiosError(err) && err.response?.status === 404) return null;
+    throw err;
+  }
 }

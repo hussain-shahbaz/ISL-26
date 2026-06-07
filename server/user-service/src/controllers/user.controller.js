@@ -370,6 +370,30 @@ class UserController {
     }
   }
 
+  // Teacher/admin: resolve a list of student IDs to names/emails for proctor
+  // reports (so the UI never has to show raw UUIDs).
+  async resolveStudentIds(req, res) {
+    try {
+      const raw = Array.isArray(req.body?.ids) ? req.body.ids : [];
+      const ids = [
+        ...new Set(raw.map((i) => String(i).trim()).filter(Boolean)),
+      ].slice(0, 500);
+
+      const students = await userService.resolveStudentsByIds(ids);
+
+      return res.status(200).json({
+        success: true,
+        data: { students },
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
+    }
+  }
+
   // Internal-only: lets the auth-service read a user's live approval state so it
   // can embed it in the access token at login/refresh. Service-secret protected.
   async getApprovalStatus(req, res) {

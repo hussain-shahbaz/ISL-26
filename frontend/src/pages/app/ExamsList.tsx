@@ -65,6 +65,7 @@ export default function ExamsListPage() {
               exam={exam}
               to={`/app/exams/${exam._id}`}
               cta={isTeacher ? 'Manage' : 'Open'}
+              studentView={!isTeacher}
               delay={i * 0.04}
             />
           ))}

@@ -11,5 +11,11 @@ class StudentExamRepository {
     async findAllByExamId(examId) {
         return await studentExam.find({ examId });
     }
+    async findByStudentId(studentId) {
+        return await studentExam.find({ studentId });
+    }
+    async countByExamId(examId) {
+        return await studentExam.countDocuments({ examId });
+    }
 }
 module.exports = new StudentExamRepository();
