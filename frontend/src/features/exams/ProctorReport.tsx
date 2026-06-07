@@ -153,7 +153,12 @@ export function ProctorReport({ exam }: { exam: Exam }) {
       }
     } catch (err) {
       setGrading(false);
-      if (!auto) toast.error('Could not start grading', apiErrorMessage(err));
+      if (!auto) {
+        toast.error(
+          'Could not start grading',
+          apiErrorMessage(err, 'The grading service is unavailable right now. Please try again.'),
+        );
+      }
     }
   }
 

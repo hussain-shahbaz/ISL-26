@@ -200,13 +200,16 @@ export async function startGrading(
   mode: GradingMode = 'medium',
 ): Promise<StartGradingResult> {
   try {
-    const res = await api.post(`${MODULES}/grade-cheat/grade/async`, null, {
+    // Empty object body (not null) — the gateway rejects primitive JSON bodies.
+    const res = await api.post(`${MODULES}/grade-cheat/grade/async`, {}, {
       params: { examId, mode },
     });
     const data = res.data as { taskId?: string };
     return { taskId: data?.taskId };
   } catch (err) {
     if (axios.isAxiosError(err) && err.response?.status === 409) {
+      // 409 = already graded OR a task is already running for this exam. Both
+      // are non-errors for us: the caller just refreshes results / keeps polling.
       const data = err.response.data as { taskId?: string; error?: string };
       const running = /running/i.test(data?.error || '');
       return { taskId: data?.taskId, alreadyGraded: !running, alreadyRunning: running };
