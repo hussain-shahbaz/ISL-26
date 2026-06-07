@@ -45,14 +45,21 @@ class LogService {
 
   async captureLog(logData) {
     try {
+      // The gateway sends the authenticated user at the top level, but the
+      // schema stores (and indexes/queries via findByUserId) it at
+      // request.userId. Map it across so the acting user is actually persisted
+      // and the "filter logs by user" feature works.
+      const sanitizedRequest = sanitize(logData.request) || {};
+      const actingUserId = logData.userId || sanitizedRequest.userId || null;
+      if (actingUserId) sanitizedRequest.userId = actingUserId;
+
       const sanitized = {
         service: logData.service,
         environment: logData.environment,
         eventType: logData.eventType,
         requestId: logData.requestId,
-        userId: logData.userId || null,
         timestamp: new Date(logData.timestamp),
-        request: sanitize(logData.request),
+        request: sanitizedRequest,
         response: sanitize(logData.response),
         error: logData.error ? sanitize(logData.error) : null,
       };
