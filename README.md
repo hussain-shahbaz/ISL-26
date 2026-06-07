@@ -67,9 +67,13 @@ npm run dev                 # gateway + auth on :3000
 npm run log                 # log-service on :3006
 npm run exam                # exam-service on :3003
 npm run submission          # student-exam on :3004
+
+# 4. Run the frontend (separate terminal)
+cd frontend && npm install
+npm run dev                 # SPA on :5173, proxies /api to the gateway
 ```
 
-> Full service containerization (one `docker compose up` for the entire stack) and the frontend are being added per `docs/PHASE2_PLAN.md`.
+> The React frontend is implemented (`frontend/`). Full service containerization (one `docker compose up` for the entire stack with Nginx) is being added per `docs/PHASE2_PLAN.md`.
 
 ---
 
@@ -124,4 +128,6 @@ We follow **Conventional Commits**: `type(scope): subject`
 
 - `docs/PHASE1_AUDIT.md` — full as-is audit of the system
 - `docs/PHASE2_PLAN.md` — target architecture and execution roadmap
+- `frontend/README.md` — frontend stack, structure, and proctoring overview
+- `server/README.md` — backend layout and per-service run instructions
 - `server/docs/` — service integration, testing, and architecture references
