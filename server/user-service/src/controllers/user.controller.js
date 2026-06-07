@@ -19,11 +19,12 @@ class UserController {
       if (!parsed.success) {
         return res.status(400).json({
           success: false,
-          message: "Validation failed jfnjf",
+          message: "Validation failed",
           errors: parsed.error.flatten().fieldErrors,
         });
       }
-      const profile = await userService.createProfile(req.body);
+      // Persist only the validated payload, never the raw request body.
+      const profile = await userService.createProfile(parsed.data);
       return res.status(201).json({
         success: true,
         message: "Profile created successfully",
@@ -163,7 +164,7 @@ class UserController {
       if (error.message === "PROFILE_NOT_FOUND") {
         return res.status(404).json({
           success: false,
-          message: "Profile notgbg found",
+          message: "Profile not found",
         });
       }
 

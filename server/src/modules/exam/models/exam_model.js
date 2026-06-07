@@ -15,4 +15,9 @@ const examSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Hot query paths: teacher listings, status filters, and student enrollment lookups.
+examSchema.index({ instructorId: 1, status: 1 });
+examSchema.index({ instructorId: 1, subject: 1 });
+examSchema.index({ students: 1 });
+
 module.exports = mongoose.model('Exam', examSchema);

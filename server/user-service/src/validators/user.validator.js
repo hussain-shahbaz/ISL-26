@@ -7,7 +7,7 @@ export const registerProfileSchema = z.object({
     .max(100, "Name cannot exceed 100 characters"),
   email: z.string().email(),
   // ADMIN removed to prevent self-registration as admin
-  role: z.enum(["STUDENT", "INSTRUCTOR", ""]),
+  role: z.enum(["STUDENT", "INSTRUCTOR"]),
 });
 export const approvalSchema = z.object({
   status: z.enum(["APPROVED", "REJECTED"]),

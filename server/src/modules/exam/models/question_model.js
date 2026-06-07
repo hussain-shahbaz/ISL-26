@@ -13,4 +13,7 @@ const questionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Questions are almost always fetched by their parent exam.
+questionSchema.index({ examId: 1 });
+
 module.exports = mongoose.model('Question', questionSchema);
