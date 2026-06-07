@@ -20,6 +20,9 @@ export class SessionRepository {
   async revoke(sessionId) {
     return Session.updateOne({ sessionId }, { revoked: true });
   }
+  async revokeAllForUser(userId) {
+    return Session.updateMany({ userId, revoked: false }, { revoked: true });
+  }
   async getUserSessions(userId) {
     return Session.find({
       userId,

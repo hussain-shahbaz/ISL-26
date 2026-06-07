@@ -286,7 +286,9 @@ export class AuthService {
     return { message: "Logged out successfully" };
   }
   async logoutAll(userId) {
-    await Session.updateMany({ userId, revoked: false }, { revoked: true });
+    // Revoke every active session for the user. Previously referenced an
+    // undefined `Session` model directly, which threw at runtime.
+    await sessionRepo.revokeAllForUser(userId);
     return true;
   }
 
