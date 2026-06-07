@@ -39,6 +39,7 @@ module.exports = {
     'password', 'passwd', 'pwd', 'secret', 'token', 'accesstoken',
     'refreshtoken', 'apikey', 'api_key', 'apisecret', 'privatekey',
     'private_key', 'ssn', 'creditcard', 'cardnumber', 'cvv', 'ccv', 'pin', 'mpin',
+    'otp', 'passwordhash',
   ],
 
   HEADERS_SANITIZE_VALUES: {
@@ -49,6 +50,9 @@ module.exports = {
     cookie: true,
     'set-cookie': true,
     'x-csrf-token': true,
+    // Internal trust secrets must never be persisted to the audit log.
+    'x-service-secret': true,
+    'x-internal-secret': true,
   },
 
   ERROR_CODES: {
