@@ -12,10 +12,12 @@ import { toast } from '@/store/toast';
 import { apiErrorMessage } from '@/lib/api';
 import { formatDate, cn } from '@/lib/utils';
 
-const services = ['gateway', 'auth-service', 'exam-service', 'student-exam', 'user-service'];
+// Every request is logged at the gateway under the "main-server" service name,
+// so that's the meaningful default for the audit view.
+const services = ['main-server'];
 
 export default function AuditPage() {
-  const [service, setService] = useState('');
+  const [service, setService] = useState('main-server');
   const [errorOnly, setErrorOnly] = useState(false);
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
@@ -24,7 +26,7 @@ export default function AuditPage() {
   });
 
   const verify = useMutation({
-    mutationFn: () => verifyChain(service || 'gateway'),
+    mutationFn: () => verifyChain(service || 'main-server'),
     onSuccess: (res) =>
       res.isValid
         ? toast.success('Chain verified', `${res.totalLogs} entries are tamper-free.`)

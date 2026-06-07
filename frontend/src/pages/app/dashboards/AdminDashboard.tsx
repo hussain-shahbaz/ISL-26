@@ -22,7 +22,7 @@ export default function AdminDashboard() {
   async function runVerify() {
     setVerifying(true);
     try {
-      const result = await verifyChain('gateway');
+      const result = await verifyChain('main-server');
       setChain({ ok: result.isValid, message: result.message, total: result.totalLogs });
       if (result.isValid) toast.success('Audit chain intact', `${result.totalLogs} links verified`);
       else toast.error('Audit chain broken', result.message);
