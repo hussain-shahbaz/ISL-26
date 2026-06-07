@@ -381,14 +381,11 @@ function IndividualReport({
   exam: Exam;
   onClose: () => void;
 }) {
-  const questionById = useMemo(
-    () => new Map((exam.questions ?? []).map((q) => [q._id, q])),
-    [exam.questions],
-  );
-
   if (!row) return null;
-  const { submission: s, identity, result } = row;
-  const name = displayName(row);
+  // Stable, non-null reference so closures (doPrint) keep the narrowed type.
+  const reportRow: Row = row;
+  const { submission: s, identity, result } = reportRow;
+  const name = displayName(reportRow);
   const answerByQ = new Map((s.answers ?? []).map((a) => [a.questionId, a.submittedAnswer]));
   const resultByQ = new Map((result?.results ?? []).map((r) => [r.questionId, r]));
 
@@ -409,7 +406,7 @@ function IndividualReport({
   function doPrint() {
     printHtml(
       `${name} — ${exam.title || exam.subject}`,
-      buildReportHtml({ row, exam, orderedQuestions, answerByQ, resultByQ, violations }),
+      buildReportHtml({ row: reportRow, exam, orderedQuestions, answerByQ, resultByQ, violations }),
     );
   }
 
