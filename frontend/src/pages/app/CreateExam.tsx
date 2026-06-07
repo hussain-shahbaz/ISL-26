@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, ListChecks, AlignLeft, Save } from 'lucide-react';
-import { createExam, type CreateExamPayload } from '@/features/exams/api';
+import { createExam, type CreateExamPayload, type StudentLite } from '@/features/exams/api';
+import { StudentPicker } from '@/features/exams/StudentPicker';
 import { PageHeader } from '@/components/app/widgets';
 import { Card, CardContent } from '@/components/ui/card';
 import { Field } from '@/components/form/fields';
@@ -34,7 +35,7 @@ export default function CreateExamPage() {
   const [title, setTitle] = useState('');
   const [scheduledTime, setScheduledTime] = useState('');
   const [timeAllowed, setTimeAllowed] = useState(60);
-  const [studentsRaw, setStudentsRaw] = useState('');
+  const [students, setStudents] = useState<StudentLite[]>([]);
   const [questions, setQuestions] = useState<DraftQuestion[]>([emptyQuestion()]);
 
   const totalMarks = useMemo(() => questions.reduce((sum, q) => sum + (Number(q.marks) || 0), 0), [questions]);
@@ -56,7 +57,6 @@ export default function CreateExamPage() {
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const students = studentsRaw.split(/[\n,]/).map((s) => s.trim()).filter(Boolean);
     if (!subject.trim()) return toast.error('Subject required');
     if (questions.some((q) => !q.questionText.trim())) return toast.error('Every question needs text');
 
@@ -66,7 +66,7 @@ export default function CreateExamPage() {
       scheduledTime: scheduledTime ? new Date(scheduledTime).toISOString() : new Date(Date.now() + 86400000).toISOString(),
       timeAllowed: Number(timeAllowed),
       totalMarks,
-      students,
+      students: students.map((s) => s.id),
       questions: questions.map((q) => ({
         type: q.type,
         marks: Number(q.marks),
@@ -109,13 +109,9 @@ export default function CreateExamPage() {
                   <Input id="dur" type="number" min={1} value={timeAllowed} onChange={(e) => setTimeAllowed(Number(e.target.value))} />
                 </Field>
               </div>
-              <Field label="Assigned students" hint="One user ID per line or comma-separated">
-                <Textarea
-                  value={studentsRaw}
-                  onChange={(e) => setStudentsRaw(e.target.value)}
-                  placeholder={'student-user-id-1\nstudent-user-id-2'}
-                />
-              </Field>
+              <div className="border-t border-border pt-4">
+                <StudentPicker selected={students} onChange={setStudents} />
+              </div>
             </CardContent>
           </Card>
 
@@ -239,6 +235,10 @@ export default function CreateExamPage() {
                 <div className="flex justify-between">
                   <dt className="text-muted">Duration</dt>
                   <dd className="font-medium">{timeAllowed} min</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-muted">Students</dt>
+                  <dd className="font-medium">{students.length}</dd>
                 </div>
               </dl>
               <Badge tone="proctor" className="mt-5">Saved as draft</Badge>

@@ -9,10 +9,18 @@ import {
   Trash2,
   Play,
   ShieldCheck,
+  ShieldAlert,
   ArrowLeft,
+  Eye,
 } from 'lucide-react';
-import { getExam, updateExamStatus, deleteExam } from '@/features/exams/api';
-import { PageHeader, ErrorState, Skeleton } from '@/components/app/widgets';
+import {
+  getExam,
+  updateExamStatus,
+  deleteExam,
+  getExamSubmissions,
+  type Submission,
+} from '@/features/exams/api';
+import { PageHeader, ErrorState, Skeleton, EmptyState } from '@/components/app/widgets';
 import { ExamStatusBadge } from '@/features/exams/components';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -149,10 +157,12 @@ export default function ExamDetailPage() {
         </Card>
       )}
 
+      {isTeacher && <ProctorReport examId={id} />}
+
       {isTeacher && exam.questions && exam.questions.length > 0 && (
         <section className="mt-8">
           <h2 className="mb-4 text-lg font-semibold">Questions ({exam.questions.length})</h2>
-          <div className="space-y-3">
+          <div className="space-y-3" data-section="questions">
             {exam.questions.map((q, i) => (
               <Card key={q._id}>
                 <CardContent className="p-5">
@@ -184,5 +194,101 @@ export default function ExamDetailPage() {
         </section>
       )}
     </div>
+  );
+}
+
+const VIOLATION_LABELS: Record<string, string> = {
+  'tab-hidden': 'Tab switch',
+  'focus-lost': 'Focus lost',
+  'fullscreen-exit': 'Fullscreen exit',
+  clipboard: 'Copy / paste',
+  'context-menu': 'Right-click',
+  'devtools-keys': 'Shortcut',
+};
+
+function riskTone(count: number): 'integrity' | 'proctor' | 'risk' {
+  if (count === 0) return 'integrity';
+  if (count <= 2) return 'proctor';
+  return 'risk';
+}
+
+function ProctorReport({ examId }: { examId: string }) {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['exam-submissions', examId],
+    queryFn: () => getExamSubmissions(examId),
+    enabled: Boolean(examId),
+  });
+
+  const submissions: Submission[] = data ?? [];
+  const totalViolations = submissions.reduce((acc, s) => acc + (s.violationCount ?? 0), 0);
+  const flagged = submissions.filter((s) => (s.violationCount ?? 0) > 0).length;
+
+  return (
+    <section className="mt-8">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 text-lg font-semibold">
+          <Eye size={18} className="text-brand" /> Proctor report
+        </h2>
+        {submissions.length > 0 && (
+          <div className="flex items-center gap-2 text-xs">
+            <Badge tone="exam">{submissions.length} submitted</Badge>
+            <Badge tone={flagged ? 'risk' : 'integrity'}>{flagged} flagged</Badge>
+            <Badge tone={totalViolations ? 'proctor' : 'integrity'}>{totalViolations} violations</Badge>
+          </div>
+        )}
+      </div>
+
+      {isLoading ? (
+        <Skeleton className="h-40" />
+      ) : isError ? (
+        <ErrorState message="Could not load submissions." />
+      ) : submissions.length === 0 ? (
+        <EmptyState
+          title="No submissions yet"
+          description="Integrity telemetry appears here as students submit."
+          icon={ShieldCheck}
+        />
+      ) : (
+        <div className="space-y-2">
+          {submissions.map((s) => {
+            const count = s.violationCount ?? 0;
+            const breakdown = (s.violations ?? []).reduce<Record<string, number>>((acc, v) => {
+              acc[v.type] = (acc[v.type] ?? 0) + 1;
+              return acc;
+            }, {});
+            return (
+              <Card key={s._id}>
+                <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-2 p-4">
+                  <span className={count > 2 ? 'text-risk' : count > 0 ? 'text-proctor' : 'text-integrity'}>
+                    {count > 0 ? <ShieldAlert size={16} /> : <ShieldCheck size={16} />}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-mono text-xs text-foreground" title={s.studentId}>
+                      {s.studentId}
+                    </p>
+                    <p className="text-xs text-muted">
+                      Submitted {formatDate(s.submittedAt)} · {s.status === 'graded' ? 'Graded' : 'Pending grading'}
+                    </p>
+                  </div>
+                  {Object.keys(breakdown).length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {Object.entries(breakdown).map(([type, n]) => (
+                        <span
+                          key={type}
+                          className="rounded-md border border-border bg-surface-2/50 px-2 py-0.5 text-[11px] text-muted"
+                        >
+                          {VIOLATION_LABELS[type] ?? type} ×{n}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <Badge tone={riskTone(count)}>{count} alerts</Badge>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }

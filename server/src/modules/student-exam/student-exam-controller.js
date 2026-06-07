@@ -34,7 +34,7 @@ class StudentExamController {
         try {
             const studentId = req.user.userId; // verified identity propagated by the gateway
             const { examId } = req.params;
-            const { answers } = req.body;
+            const { answers, violations } = req.body;
 
             if (!Array.isArray(answers) || answers.length === 0) {
                 return res.status(400).json({
@@ -58,10 +58,23 @@ class StudentExamController {
                 });
             }
 
+            // Proctoring telemetry is advisory and untrusted; sanitize and cap it.
+            const normalizedViolations = Array.isArray(violations)
+                ? violations
+                      .filter((v) => v && typeof v.type === 'string')
+                      .slice(0, 200)
+                      .map((v) => ({
+                          type: String(v.type).slice(0, 40),
+                          at: v.at ? new Date(v.at) : new Date(),
+                      }))
+                : [];
+
             const submissionData = {
                 studentId,
                 examId,
                 answers: normalizedAnswers,
+                violations: normalizedViolations,
+                violationCount: normalizedViolations.length,
                 submittedAt: new Date(), // server-authoritative submission time
             };
 

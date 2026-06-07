@@ -37,6 +37,19 @@ userRouter.get(
   authorizeRoles(config.ROLES.ADMIN),
   userController.getStudents
 );
+// Teacher/admin student search + email resolution for exam enrollment.
+userRouter.get(
+  "/students/search",
+  authenticate,
+  authorizeRoles(config.ROLES.ADMIN, config.ROLES.INSTRUCTOR),
+  userController.searchStudents
+);
+userRouter.post(
+  "/students/resolve",
+  authenticate,
+  authorizeRoles(config.ROLES.ADMIN, config.ROLES.INSTRUCTOR),
+  userController.resolveStudents
+);
 userRouter.patch(
   "/instructors/:id/reject",
   authenticate,

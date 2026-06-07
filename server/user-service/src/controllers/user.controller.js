@@ -319,6 +319,57 @@ class UserController {
     }
   }
 
+  // Teacher/admin: search students (by name or email) for exam enrollment.
+  // Unlike getStudents, this is not university-scoped so teachers can find
+  // any student they intend to enroll.
+  async searchStudents(req, res) {
+    try {
+      const search = (req.query.search || "").toString().trim();
+      const limit = Math.min(Number(req.query.limit) || 20, 50);
+
+      const { users } = await userService.getStudents({
+        page: 1,
+        limit,
+        search: search || undefined,
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: { users: users.map(formatStudent) },
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
+    }
+  }
+
+  // Teacher/admin: resolve a list of student emails to canonical user IDs
+  // (the paste-emails enrollment fallback).
+  async resolveStudents(req, res) {
+    try {
+      const raw = Array.isArray(req.body?.emails) ? req.body.emails : [];
+      const emails = [
+        ...new Set(raw.map((e) => String(e).trim()).filter(Boolean)),
+      ].slice(0, 200);
+
+      const { matched, unmatched } = await userService.resolveStudentsByEmails(emails);
+
+      return res.status(200).json({
+        success: true,
+        data: { matched, unmatched },
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
+    }
+  }
+
   async getInstructors(req, res) {
     try {
       const parsed = paginationSchema.safeParse(req.query);

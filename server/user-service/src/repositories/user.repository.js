@@ -90,6 +90,17 @@ class UserRepository {
       },
     });
   }
+
+  async findStudentsByEmails(emails) {
+    if (!Array.isArray(emails) || emails.length === 0) return [];
+    return await prisma.userProfile.findMany({
+      where: {
+        isDeleted: false,
+        role: "STUDENT",
+        email: { in: emails },
+      },
+    });
+  }
   async updateApprovalStatus(userId, { status, approvedBy }) {
     return await prisma.userProfile.update({
       where: { id: userId },

@@ -83,6 +83,19 @@ class UserService {
     });
   }
 
+  async resolveStudentsByEmails(emails) {
+    const users = await userRepository.findStudentsByEmails(emails);
+    const byEmail = new Map(users.map((u) => [u.email.trim(), u]));
+    const matched = [];
+    const unmatched = [];
+    for (const email of emails) {
+      const user = byEmail.get(email);
+      if (user) matched.push({ id: user.id, name: user.name, email: user.email });
+      else unmatched.push(email);
+    }
+    return { matched, unmatched };
+  }
+
   async getInstructors({ page, limit, search }) {
     return await userRepository.findUsers({
       role: "INSTRUCTOR",

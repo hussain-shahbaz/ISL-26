@@ -44,6 +44,7 @@ export default function ExamRunnerPage() {
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const submittedRef = useRef(false);
+  const violationsRef = useRef<Violation[]>([]);
 
   const { data: exam, isLoading, isError, error } = useQuery({
     queryKey: ['student-exam-detail', examId],
@@ -64,7 +65,12 @@ export default function ExamRunnerPage() {
           questionId,
           submittedAnswer,
         }));
-        await submitExam(examId, payload);
+        // Attach proctoring telemetry so teachers/admins can review integrity.
+        const violationPayload = violationsRef.current.map((v) => ({
+          type: v.type,
+          at: new Date(v.at).toISOString(),
+        }));
+        await submitExam(examId, payload, violationPayload);
         localStorage.removeItem(storageKey);
         if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
         toast.success('Exam submitted', reason || 'Your answers were recorded securely.');
@@ -94,6 +100,11 @@ export default function ExamRunnerPage() {
     onViolation,
     onLimitReached,
   });
+
+  // Keep a ref of violations so submit (defined above) always sends the latest.
+  useEffect(() => {
+    violationsRef.current = violations;
+  }, [violations]);
 
   // Secure countdown derived from the server-provided schedule.
   useEffect(() => {

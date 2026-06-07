@@ -16,12 +16,27 @@ const studentAnswerSchema = new mongoose.Schema({
 //   marksObtained: { type: Number, default: 0 }  // Populated after grading
 });
 
+// A single proctoring event captured by the client during the exam
+// (tab switch, focus loss, fullscreen exit, clipboard, right-click, devtools).
+const proctoringViolationSchema = new mongoose.Schema(
+  {
+    type: { type: String, required: true },
+    at: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 const submittedExamSchema = new mongoose.Schema(
   {
     examId: { type: String , required: true },
     studentId: { type: String, required: true }, // Pulled securely from JWT
     
     answers: [studentAnswerSchema], // Array of subdocuments containing answers
+
+    // Proctoring telemetry: integrity signals captured while the student
+    // sat the exam. Teachers/admins review these per submission.
+    violations: { type: [proctoringViolationSchema], default: [] },
+    violationCount: { type: Number, default: 0 },
     
     // Summary statistics for quick querying (calculates student performance metrics)
     // totalMarksPossible: { type: Number, required: true }, // Snapshot of Exam.totalMarks at submission
