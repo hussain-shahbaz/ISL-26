@@ -5,8 +5,8 @@ class ExamValidator {
   validateCreate(body) {
     const errors = [];
 
-    if (!body.instructorId || !Number.isInteger(Number(body.instructorId))) {
-      errors.push('instructorId is required and must be an integer');
+    if (!body.instructorId || String(body.instructorId).trim() === '') {
+      errors.push('instructorId is required');
     }
 
     if (!body.subject || body.subject.trim() === '') {
@@ -49,8 +49,8 @@ class ExamValidator {
     const errors = [];
     const allowed = ['draft', 'saved', 'published', 'submitted', 'checked'];
 
-    if (body.instructorId !== undefined && !Number.isInteger(Number(body.instructorId))) {
-      errors.push('instructorId must be an integer');
+    if (body.instructorId !== undefined && String(body.instructorId).trim() === '') {
+      errors.push('instructorId cannot be empty');
     }
 
     if (body.title !== undefined && body.title.trim() === '') {

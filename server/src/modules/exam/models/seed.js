@@ -53,8 +53,8 @@ const questionSchema = new mongoose.Schema(
 
 const studentExamSchema = new mongoose.Schema(
   {
-    rollNumber: { type: String, required: true, unique: true },
-    examIds:    [{ type: mongoose.Schema.Types.ObjectId, ref: 'Exam' }]
+    studentId: { type: String, required: true, unique: true },
+    examIds:   [{ type: mongoose.Schema.Types.ObjectId, ref: 'Exam' }]
   },
   { timestamps: true }
 );
@@ -181,16 +181,16 @@ async function seed() {
     log(`Exam totalMarks set to ${exam.totalMarks}`);
 
     // ---- Assign students (StudentExam) ----
-    const studentRollNumbers = ['S001', 'S002', 'S003'];
+    const studentIds = ['S001', 'S002', 'S003'];
     await StudentExam.insertMany(
-      studentRollNumbers.map(roll => ({ rollNumber: roll, examIds: [exam._id] }))
+      studentIds.map(id => ({ studentId: id, examIds: [exam._id] }))
     );
-    log(`Assigned ${studentRollNumbers.length} students.`);
+    log(`Assigned ${studentIds.length} students.`);
 
     // ---- Create submissions (SubmittedExam) ----
-    const submissions = studentRollNumbers.map(roll => ({
+    const submissions = studentIds.map(id => ({
       examId: exam._id.toString(),
-      studentId: roll,
+      studentId: id,
       answers: generateAnswers(questions),
       status: 'pending_grading',
       submittedAt: new Date()
@@ -199,7 +199,7 @@ async function seed() {
     log(`Created ${submissions.length} submissions.`);
 
     // ---- Update exam.students array (optional) ----
-    exam.students = studentRollNumbers;
+    exam.students = studentIds;
     await exam.save();
 
     // ---- Verification ----
@@ -212,7 +212,7 @@ async function seed() {
     const sub = await SubmittedExam.findOne();
     if (sub) {
       const examExists = await Exam.findById(sub.examId);
-      const studentExists = await StudentExam.findOne({ rollNumber: sub.studentId });
+      const studentExists = await StudentExam.findOne({ studentId: sub.studentId });
       const allQuestionIdsValid = (await Question.find({ examId: sub.examId }))
         .every(q => sub.answers.some(a => a.questionId === q._id.toString()));
       log('Integrity check:');

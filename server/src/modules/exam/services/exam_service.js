@@ -16,8 +16,8 @@ class ExamService {
     return exam;
   }
 
-  async getExamsByStudent(rollNumber) {
-    const studentExams = await studentExamRepository.findByRollNumber(rollNumber);
+  async getExamsByStudent(studentId) {
+    const studentExams = await studentExamRepository.findByStudentId(studentId);
     if (!studentExams) return [];
 
     const exams = await examRepository.findByIds(studentExams.examIds);
@@ -34,11 +34,31 @@ class ExamService {
     return exam;
   }
 
-  async getExamWithQuestions(examId) {
+  // Role-aware exam detail. The owning teacher sees questions with their
+  // reference answers; an enrolled student sees metadata + questions WITHOUT
+  // reference answers; anyone else is rejected.
+  async getExamWithQuestions(examId, user) {
     const exam = await examRepository.findById(examId);
     if (!exam) throw new Error('Exam not found');
-    const questions = await questionRepository.findByExamId(examId);
-    return { ...exam, questions };
+
+    const role = user && user.role;
+
+    if (role === 'teacher') {
+      if (exam.instructorId !== user.userId) throw new Error('Not authorized');
+      const questions = await questionRepository.findByExamId(examId);
+      return { ...exam, questions };
+    }
+
+    if (role === 'student') {
+      if (!Array.isArray(exam.students) || !exam.students.includes(user.userId)) {
+        throw new Error('You are not allowed in this exam');
+      }
+      const questions = await questionRepository.findByExamId(examId);
+      const safeQuestions = questions.map(({ referenceAnswer, ...rest }) => rest);
+      return { ...exam, questions: safeQuestions };
+    }
+
+    throw new Error('Not authorized');
   }
 
   async getExamsByTeacher(instructorId) {
@@ -69,14 +89,14 @@ class ExamService {
     delete data.status
 
     if (data.students) {
-      const removed = exam.students.filter(r => !data.students.includes(r));
-      const added   = data.students.filter(r => !exam.students.includes(r));
+      const removed = exam.students.filter(s => !data.students.includes(s));
+      const added   = data.students.filter(s => !exam.students.includes(s));
 
-      for (const rollNumber of removed) {
-        await studentExamRepository.removeExamFromStudent(rollNumber, id);
+      for (const studentId of removed) {
+        await studentExamRepository.removeExamFromStudent(studentId, id);
       }
-      for (const rollNumber of added) {
-        await studentExamRepository.addExamToStudent(rollNumber, id);
+      for (const studentId of added) {
+        await studentExamRepository.addExamToStudent(studentId, id);
       }
     }
 
@@ -133,17 +153,17 @@ class ExamService {
     // agar published exam ko hata rhy hony tou kya hoga
 
     if (exam.status === 'published' && newStatus !== 'published') {
-      for (const rollNumber of exam.students) {
-        await studentExamRepository.removeExamFromStudent(rollNumber, id);
+      for (const studentId of exam.students) {
+        await studentExamRepository.removeExamFromStudent(studentId, id);
       }
     }
 
     const updated = await examRepository.updateById(id, { status: newStatus });
 
-  // publish hone ke baad mapping banao
+    // Build the enrollment mapping once the exam goes live.
     if (newStatus === 'published') {
-      for (const rollNumber of exam.students) {
-        await studentExamRepository.addExamToStudent(rollNumber, id);
+      for (const studentId of exam.students) {
+        await studentExamRepository.addExamToStudent(studentId, id);
       }
     }
 
@@ -159,8 +179,8 @@ class ExamService {
       throw new Error('Published, submitted or checked exam cannot be updated');
     }
 
-    for (const rollNumber of exam.students) {
-      await studentExamRepository.removeExamFromStudent(rollNumber, id);
+    for (const studentId of exam.students) {
+      await studentExamRepository.removeExamFromStudent(studentId, id);
     }
 
     await questionRepository.deleteByExamId(id);

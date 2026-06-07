@@ -2,28 +2,28 @@ const StudentExam = require('../models/student_exam_model');
 
 class StudentExamRepository {
 
-  async addExamToStudent(rollNumber, examId) {
+  async addExamToStudent(studentId, examId) {
     return await StudentExam.findOneAndUpdate(
-      { rollNumber },
-      { $addToSet: { examIds: examId } }, // duplicate nahi aayega
-      { upsert: true, new: true }          // record nahi mila toh bana do
+      { studentId },
+      { $addToSet: { examIds: examId } },
+      { upsert: true, new: true }
     );
   }
 
-  async removeExamFromStudent(rollNumber, examId) {
+  async removeExamFromStudent(studentId, examId) {
     return await StudentExam.findOneAndUpdate(
-      { rollNumber },
+      { studentId },
       { $pull: { examIds: examId } },
       { new: true }
     );
   }
 
-  async findByRollNumber(rollNumber) {
-    return await StudentExam.findOne({ rollNumber });
+  async findByStudentId(studentId) {
+    return await StudentExam.findOne({ studentId });
   }
 
-  async findExamsByRollNumber(rollNumber) {
-    return await StudentExam.findOne({ rollNumber }).populate('examIds');
+  async findExamsByStudentId(studentId) {
+    return await StudentExam.findOne({ studentId }).populate('examIds');
   }
 }
 

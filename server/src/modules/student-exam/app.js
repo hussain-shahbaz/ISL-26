@@ -24,10 +24,10 @@ class App {
     }
 
     start() {
-        this.app.listen(process.env.PORT || 3005, () => {
-                console.log(`Student Exam Service is running on port ${process.env.PORT || 3005}`);     
-            }
-        )
+        const port = process.env.STUDENT_EXAM_PORT || process.env.PORT || 3004;
+        this.app.listen(port, () => {
+            console.log(`student-exam-service listening on port ${port}`);
+        });
     }
 }
 

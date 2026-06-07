@@ -108,7 +108,7 @@ class ExamController {
     if (!isValid) return res.status(400).json({ status: 'error', errors });
 
     try {
-      const exam = await examService.getExamWithQuestions(req.params.id);
+      const exam = await examService.getExamWithQuestions(req.params.id, req.user);
       res.status(200).json({ status: 'success', message: 'Exam fetched successfully', data: exam });
     } catch (err) {
       res.status(400).json({ status: 'error', message: err.message });

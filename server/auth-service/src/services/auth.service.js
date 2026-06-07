@@ -218,10 +218,32 @@ export class AuthService {
     });
   }
   async getMe(userId) {
-    return authRepo.findByUserId(userId);
+    const user = await authRepo.findByUserId(userId);
+    if (!user) return null;
+    // Never expose the password hash to clients.
+    return {
+      userId: user.userId,
+      email: user.email,
+      role: user.role,
+      isEmailVerified: user.isEmailVerified,
+      isBlocked: user.isBlocked,
+      lastLoginAt: user.lastLoginAt,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
   }
   async getSessions(userId) {
-    return sessionRepo.getUserSessions(userId);
+    const sessions = await sessionRepo.getUserSessions(userId);
+    // Strip the refresh token hash; expose only safe session metadata.
+    return (sessions || []).map((s) => ({
+      sessionId: s.sessionId,
+      ipAddress: s.ipAddress,
+      userAgent: s.userAgent,
+      revoked: s.revoked,
+      expiresAt: s.expiresAt,
+      lastActivityAt: s.lastActivityAt,
+      createdAt: s.createdAt,
+    }));
   }
   async logout(refreshToken, jti, exp) {
     if (!refreshToken) {

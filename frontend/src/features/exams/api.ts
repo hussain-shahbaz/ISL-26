@@ -59,7 +59,7 @@ export async function getStudentExamDetails(examId: string): Promise<Exam & { qu
 export async function submitExam(examId: string, answers: SubmissionAnswer[]) {
   const payload = {
     answers: answers.map((a) => ({
-      question: { questionId: a.questionId },
+      questionId: a.questionId,
       submittedAnswer: a.submittedAnswer,
     })),
   };

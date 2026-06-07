@@ -44,13 +44,24 @@ class StudentExamController {
                 });
             }
 
+            // Accept the canonical flat shape { questionId, submittedAnswer }.
+            const normalizedAnswers = answers.map((ans) => ({
+                questionId: ans.questionId ?? ans.question?.questionId,
+                submittedAnswer: ans.submittedAnswer,
+            }));
+
+            if (normalizedAnswers.some((a) => !a.questionId)) {
+                return res.status(400).json({
+                    status: 'error', error_code: 400,
+                    message: 'Each answer must include a questionId',
+                    timestamp: new Date().toISOString(),
+                });
+            }
+
             const submissionData = {
                 studentId,
                 examId,
-                answers: answers.map((ans) => ({
-                    questionId: ans.question.questionId,
-                    submittedAnswer: ans.submittedAnswer,
-                })),
+                answers: normalizedAnswers,
                 submittedAt: new Date(), // server-authoritative submission time
             };
 
@@ -99,7 +110,11 @@ class StudentExamController {
     async getSubmissionByExamIdAndStudentId(req, res) {
         try {
             const { examId } = req.params;
-            const { studentId } = req.query;
+            // Students may only ever read their own submission; teachers/admins
+            // may target a specific student or list all submissions for an exam.
+            const isPrivileged = req.user.role === 'teacher' || req.user.role === 'admin';
+            const studentId = isPrivileged ? req.query.studentId : req.user.userId;
+
             const details = await studentExamService.getSubmissionByExamIdAndStudentId(examId, studentId);
             return res.status(200).json({
                 status: 'success',

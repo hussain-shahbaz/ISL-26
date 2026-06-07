@@ -26,8 +26,9 @@ class App {
   }
 
   start() {
-    this.app.listen(process.env.PORT || 3002, () => {
-      console.log(`Server chal raha hai port ${process.env.PORT || 3002} pe`);
+    const port = process.env.EXAM_PORT || process.env.PORT || 3003;
+    this.app.listen(port, () => {
+      console.log(`exam-service listening on port ${port}`);
     });
   }
 }
