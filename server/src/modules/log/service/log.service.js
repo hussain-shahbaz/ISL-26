@@ -10,14 +10,35 @@ class LogService {
   // Single definition of the data covered by the hash chain. Used by both
   // captureLog and verifyChainIntegrity so the two can never drift apart.
   _hashPayload(log) {
+    // Project to ONLY the fields that are persisted, in a fixed key order, so
+    // the hash computed at capture time matches the one recomputed from the
+    // stored document during verification. (Notably, response.headers are not
+    // persisted by the schema, so they must be excluded from the hash.)
+    const req = log.request || {};
+    const res = log.response || {};
     return {
       eventType: log.eventType,
       requestId: log.requestId,
       timestamp: new Date(log.timestamp).toISOString(),
       service: log.service,
       environment: log.environment,
-      request: log.request,
-      response: log.response,
+      request: {
+        method: req.method ?? null,
+        url: req.url ?? null,
+        path: req.path ?? null,
+        query: req.query ?? null,
+        params: req.params ?? null,
+        headers: req.headers ?? null,
+        body: req.body ?? null,
+        ip: req.ip ?? null,
+        userId: req.userId ?? null,
+        userAgent: req.userAgent ?? null,
+      },
+      response: {
+        statusCode: res.statusCode ?? null,
+        responseTime: res.responseTime ?? null,
+        body: res.body ?? null,
+      },
       error: log.error ?? null,
     };
   }

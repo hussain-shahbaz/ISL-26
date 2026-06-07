@@ -32,15 +32,16 @@ class Config:
 
     # Flask
     FLASK_ENV = os.getenv("FLASK_ENV", "development")
-    FLASK_PORT = int(os.getenv("FLASK_PORT", "3004"))
+    # Canonical port for the grade-cheat service is 3005 (matches the gateway).
+    FLASK_PORT = int(os.getenv("GRADE_CHEAT_PORT", os.getenv("FLASK_PORT", "3005")))
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key")
     DEBUG = FLASK_ENV == "development"
     TESTING = False
 
     #Microservices URLS
     SERVICE_SECRET = os.getenv("SERVICE_SECRET","")
-    SUBMISSION_BASE_URL = os.getenv("SUBMISSION_BASE_URL", "http://localhost:3005/api/v1/student-exam")
-    EXAM_BASE_URL = os.getenv("EXAM_BASE_URL", "http://localhost:3002/api/exam")
+    SUBMISSION_BASE_URL = os.getenv("SUBMISSION_BASE_URL", "http://localhost:3004/api/v1/student-exam")
+    EXAM_BASE_URL = os.getenv("EXAM_BASE_URL", "http://localhost:3003/api/exam")
 
     # Gemini — comma-separated keys rotate on quota errors
     GEMINI_API_KEYS = _GEMINI_KEYS
@@ -66,7 +67,7 @@ class Config:
     MONGODB_DB = os.getenv("MONGODB_DB", "grades")
 
     # Redis / Celery
-    REDIS_URL = os.getenv("REDIS_URL", "redis://172.28.244.79:6379/0")
+    REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     CELERY_BROKER_URL = REDIS_URL
     CELERY_RESULT_BACKEND = REDIS_URL
     CELERY_TASK_TRACK_STARTED = True
