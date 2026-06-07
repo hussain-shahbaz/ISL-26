@@ -9,9 +9,11 @@ Microservices and the API gateway for the Secure Online Examination System. See 
 ```text
 server/
 ├── app.js                 # API gateway (entry point, :3000)
+├── Dockerfile             # shared image: gateway, exam, student-exam, log
 ├── auth-service/          # authentication (attached in-process to the gateway)
-├── user-service/          # user profiles & RBAC (:3002)
-├── risk-service/          # Neo4j collusion graph analytics (:3007)
+├── user-service/          # user profiles & RBAC (:3002, own Dockerfile)
+├── risk-service/          # Neo4j collusion graph analytics (:3007, own Dockerfile)
+├── scripts/               # operational scripts (test-routes integration check)
 ├── docs/                  # integration, API reference, testing, architecture
 └── src/
     ├── common/

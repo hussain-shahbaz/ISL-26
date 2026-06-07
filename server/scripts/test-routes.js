@@ -2,13 +2,13 @@
 
 /**
  * Microservice Integration - Comprehensive HTTP Routes Test
- * 
- * This script tests all HTTP routes for:
- * - Exam Service (Port 3002)
- * - Student-Exam Service (Port 3005)
- * - Grade-Cheat Service (Port 3004)
- * 
- * Run: node test-routes.js
+ *
+ * Exercises the public API surface through the gateway (:3000):
+ * - exam-service        (:3003)
+ * - student-exam        (:3004)
+ * - grade-cheat         (:3005)
+ *
+ * Run (with the stack up): node server/scripts/test-routes.js
  */
 
 const axios = require('axios');

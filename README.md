@@ -41,6 +41,7 @@ A modular, security-first online examination platform built as a set of microser
 | student-exam | Node / Express | 3004 | Submissions & results |
 | grade-cheat | Python / Flask + Celery | 3005 | LLM grading, plagiarism (TF-IDF + vector) |
 | log-service | Node / Express | 3006 | Tamper-evident audit logging |
+| risk-service | Node / Express | 3007 | Graph collusion & integrity analytics (Neo4j) |
 
 ---
 
@@ -54,26 +55,41 @@ A modular, security-first online examination platform built as a set of microser
 
 ## Quick start
 
+### Full stack with Docker Compose (recommended)
+
+One command builds and runs everything — the distributed data layer, every
+microservice, and the Nginx edge that serves the SPA and proxies the API.
+
 ```bash
-# 1. Configure environment
-cp .env.example .env        # then fill in secrets (JWT_SECRET, SERVICE_SECRET, DB creds, API keys)
+cp .env.example .env             # fill in secrets (JWT_SECRET, SERVICE_SECRET, API keys)
+docker compose up -d --build     # data layer + all services + frontend
+```
 
-# 2. Start the distributed database layer
-docker compose up -d        # Postgres, Mongo, Redis, Neo4j, Chroma
+Then open **http://localhost** — Nginx serves the React SPA and reverse-proxies
+`/api` to the gateway. This is the same setup used for EC2 deployment (see
+`docs/PHASE2_PLAN.md`).
 
-# 3. Install and run services (during development)
+### Local development (without containers)
+
+```bash
+# 1. Start only the distributed database layer
+docker compose up -d postgres mongo redis neo4j chroma
+
+# 2. Run the Node services (from server/)
 cd server && npm install
 npm run dev                 # gateway + auth on :3000
 npm run log                 # log-service on :3006
 npm run exam                # exam-service on :3003
 npm run submission          # student-exam on :3004
+npm run risk                # risk-service on :3007
+
+# 3. Run the grade-cheat service (Python)
+cd server/src/modules/grade-cheat && pip install -r requirements.txt && python main.py
 
 # 4. Run the frontend (separate terminal)
 cd frontend && npm install
 npm run dev                 # SPA on :5173, proxies /api to the gateway
 ```
-
-> The React frontend is implemented (`frontend/`). Full service containerization (one `docker compose up` for the entire stack with Nginx) is being added per `docs/PHASE2_PLAN.md`.
 
 ---
 
@@ -82,21 +98,24 @@ npm run dev                 # SPA on :5173, proxies /api to the gateway
 ```text
 ISL-26/
 ├── README.md                 # this file
-├── docker-compose.yml        # distributed database layer (+ services, in progress)
+├── docker-compose.yml        # full stack: data layer + services + Nginx edge
 ├── .env.example              # single source of truth for configuration
 ├── docs/                     # project-level docs (audit, plan, progress)
-├── frontend/                 # React + TypeScript SPA
+├── frontend/                 # React + TypeScript SPA (Dockerfile + nginx.conf)
 └── server/
     ├── app.js                # API gateway
+    ├── Dockerfile            # shared image for gateway/exam/student-exam/log
     ├── auth-service/         # authentication (attached in-process to gateway)
-    ├── user-service/         # user profiles & RBAC
+    ├── user-service/         # user profiles & RBAC (own Dockerfile, Prisma)
+    ├── risk-service/         # Neo4j collusion analytics (own Dockerfile)
+    ├── scripts/              # operational scripts (integration smoke test)
     ├── docs/                 # server-level reference docs
     └── src/
         ├── common/           # gateway proxy, logging middleware, queue
         └── modules/
             ├── exam/         # exam authoring
             ├── student-exam/ # submissions
-            ├── grade-cheat/  # grading & plagiarism (Python)
+            ├── grade-cheat/  # grading & plagiarism (Python, own Dockerfile)
             └── log/          # audit logging
 ```
 
