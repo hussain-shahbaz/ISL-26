@@ -73,6 +73,11 @@ export async function resetPassword(email: string, password: string) {
   return res.data;
 }
 
+export async function changePassword(currentPassword: string, newPassword: string) {
+  const res = await api.post('/auth/change-password', { currentPassword, newPassword });
+  return res.data;
+}
+
 export async function logout() {
   try {
     await api.post('/auth/logout');

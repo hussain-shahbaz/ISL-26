@@ -131,6 +131,14 @@ export class AuthController {
       next(err);
     }
   }
+  async changePassword(req, res, next) {
+    try {
+      const result = await authService.changePassword(req.user.userId, req.body);
+      return res.json({ success: true, message: result.message });
+    } catch (error) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+  }
   async requestNewOTP(req, res, next) {
     try {
       const result = await authService.requestNewOTP(req.body);

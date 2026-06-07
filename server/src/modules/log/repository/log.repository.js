@@ -185,6 +185,66 @@ class LogRepository {
     }
   }
 
+  // Unified, combinable query used by the admin audit view.
+  // Every filter is optional and ANDed together; no filter = most recent logs.
+  async query(filters = {}, options = {}) {
+    try {
+      const {
+        limit = config.QUERY_LIMITS.DEFAULT_LIMIT,
+        skip = 0,
+        sort = { timestamp: -1 },
+      } = options;
+
+      const mongoQuery = {};
+      const and = [];
+
+      if (filters.service) mongoQuery.service = filters.service;
+      if (filters.eventType) mongoQuery.eventType = filters.eventType;
+      if (filters.environment) mongoQuery.environment = filters.environment;
+      if (filters.userId) mongoQuery['request.userId'] = filters.userId;
+      if (filters.statusCode) mongoQuery['response.statusCode'] = Number(filters.statusCode);
+
+      if (filters.startTime || filters.endTime) {
+        mongoQuery.timestamp = {};
+        if (filters.startTime) mongoQuery.timestamp.$gte = new Date(filters.startTime);
+        if (filters.endTime) mongoQuery.timestamp.$lte = new Date(filters.endTime);
+      }
+
+      if (filters.errorOnly === true || filters.errorOnly === 'true') {
+        and.push({
+          $or: [{ 'response.statusCode': { $gte: 400 } }, { error: { $ne: null } }],
+        });
+      }
+
+      if (filters.search) {
+        const escaped = String(filters.search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const rx = new RegExp(escaped, 'i');
+        and.push({
+          $or: [
+            { 'request.path': rx },
+            { 'request.url': rx },
+            { 'request.method': rx },
+            { requestId: rx },
+            { 'request.userId': rx },
+          ],
+        });
+      }
+
+      if (and.length) mongoQuery.$and = and;
+
+      const logs = await Log.find(mongoQuery)
+        .sort(sort)
+        .limit(limit)
+        .skip(skip)
+        .lean();
+      const total = await Log.countDocuments(mongoQuery);
+      return { data: logs, total };
+    } catch (error) {
+      logger.error('Failed to query logs', error);
+      throw error;
+    }
+  }
+
   async getLastLog(service, environment = null) {
     try {
       const query = { service };

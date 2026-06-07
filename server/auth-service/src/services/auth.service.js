@@ -466,6 +466,30 @@ export class AuthService {
       message: "OTP verified successfully. You can now reset your password.",
     };
   }
+  // Authenticated password change: verify the current password, then rotate.
+  // All sessions are revoked so a stolen refresh token can't outlive the change.
+  async changePassword(userId, { currentPassword, newPassword }) {
+    const user = await authRepo.findByUserId(userId);
+    if (!user) throw new Error("User not found");
+
+    const matched = await compareHash(currentPassword, user.passwordHash);
+    if (!matched) throw new Error("Current password is incorrect");
+
+    if (currentPassword === newPassword) {
+      throw new Error("New password must be different from the current password");
+    }
+
+    const passwordHash = await hashValue(newPassword);
+    await authRepo.updatePassword(userId, passwordHash);
+
+    // Invalidate every existing session; the user re-authenticates everywhere.
+    await sessionRepo.revokeAllForUser(userId);
+
+    return {
+      message:
+        "Password changed successfully. For your security, please sign in again.",
+    };
+  }
   async resetPassword(body) {
     // 1. find user
     const user = await authRepo.findByEmail(body.email);

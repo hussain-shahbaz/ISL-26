@@ -14,6 +14,7 @@ import {
   forgotPasswordSchema,
   verifyResetOTPSchema,
   resetPasswordSchema,
+  changePasswordSchema,
 } from "../validators/auth.validator.js";
 authRouter.post(
   "/register",
@@ -43,7 +44,18 @@ authRouter.get("/me", authMiddleware, controller.me);
 authRouter.get("/sessions", authMiddleware, controller.sessions);
 // LOGOUT
 authRouter.post("/logout", authMiddleware, controller.logout);
-// LOGOUT ALL
+// LOGOUT ALL DEVICES
+authRouter.post("/logout-all", authMiddleware, controller.logoutAll);
+// REVOKE A SINGLE SESSION
+authRouter.post("/sessions/:id/revoke", authMiddleware, controller.revokeSession);
+// CHANGE PASSWORD (authenticated)
+authRouter.post(
+  "/change-password",
+  authLimiter,
+  authMiddleware,
+  validate(changePasswordSchema),
+  controller.changePassword
+);
 // REQUEST NEW EMAIL OTP
 authRouter.post(
   "/request-otp",

@@ -157,55 +157,19 @@ class LogService {
 
   async queryLogs(filters, options = {}) {
     try {
-      let result;
-
-      if (filters.service && filters.eventType) {
-        result = await LogRepository.findByService(filters.service, {
-          eventType: filters.eventType,
-          limit: options.limit || config.QUERY_LIMITS.DEFAULT_LIMIT,
-          skip: options.skip || 0,
-        });
-      } else if (filters.service) {
-        result = await LogRepository.findByService(filters.service, {
-          limit: options.limit || config.QUERY_LIMITS.DEFAULT_LIMIT,
-          skip: options.skip || 0,
-        });
-      } else if (filters.userId) {
-        result = await LogRepository.findByUserId(filters.userId, {
-          limit: options.limit || config.QUERY_LIMITS.DEFAULT_LIMIT,
-          skip: options.skip || 0,
-        });
-      } else if (filters.statusCode) {
-        result = await LogRepository.findByStatusCode(filters.statusCode, {
-          limit: options.limit || config.QUERY_LIMITS.DEFAULT_LIMIT,
-          skip: options.skip || 0,
-        });
-      } else if (filters.startTime && filters.endTime) {
-        result = await LogRepository.findByDateRange(
-          filters.startTime,
-          filters.endTime,
-          {
-            limit: options.limit || config.QUERY_LIMITS.DEFAULT_LIMIT,
-            skip: options.skip || 0,
-          }
-        );
-      } else if (filters.errorOnly === true) {
-        result = await LogRepository.findErrorLogs({
-          limit: options.limit || config.QUERY_LIMITS.DEFAULT_LIMIT,
-          skip: options.skip || 0,
-        });
-      } else {
-        return {
-          success: false,
-          error: 'No valid filter provided',
-          statusCode: 400,
-        };
-      }
+      // Single combinable query: filters are ANDed, and an empty filter set
+      // returns the most recent logs (the audit view's default).
+      const result = await LogRepository.query(filters, {
+        limit: options.limit || config.QUERY_LIMITS.DEFAULT_LIMIT,
+        skip: options.skip || 0,
+      });
 
       return {
         success: true,
         data: result.data,
         total: result.total,
+        limit: options.limit || config.QUERY_LIMITS.DEFAULT_LIMIT,
+        skip: options.skip || 0,
         statusCode: 200,
       };
     } catch (error) {

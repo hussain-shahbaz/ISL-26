@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ShieldCheck, Lock, ScanFace, Activity } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
-import { ThemeToggle } from '@/components/ThemeToggle';
 
 const highlights = [
   { icon: ScanFace, text: 'Identity verified with OTP and device binding' },
@@ -70,14 +69,13 @@ export function AuthLayout({
         </div>
       </aside>
 
-      {/* Form panel */}
-      <main className="relative flex flex-col bg-background">
+      {/* Form panel — locked to light mode for the signature split look. */}
+      <main className="auth-light relative flex flex-col bg-background text-foreground">
         <div className="flex items-center justify-between p-6">
           <Link to="/" className="lg:hidden">
             <Logo />
           </Link>
           <span className="hidden lg:block" />
-          <ThemeToggle />
         </div>
 
         <div className="flex flex-1 items-center justify-center px-6 pb-12">

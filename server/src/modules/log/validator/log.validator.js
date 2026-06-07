@@ -66,12 +66,21 @@ const validateQueryLogs = [
   query('eventType')
     .optional()
     .isIn(['REQUEST', 'RESPONSE']).withMessage('EventType must be REQUEST or RESPONSE'),
-  
+
+  query('environment')
+    .optional()
+    .isIn(['development', 'staging', 'production', 'testing']).withMessage('Invalid environment'),
+
   query('userId')
     .optional()
     .trim()
     .isString().withMessage('UserId must be a string'),
-  
+
+  query('search')
+    .optional()
+    .trim()
+    .isString().withMessage('Search must be a string'),
+
   query('statusCode')
     .optional()
     .isInt({ min: 100, max: 599 }).withMessage('StatusCode must be between 100 and 599'),
@@ -83,10 +92,11 @@ const validateQueryLogs = [
   query('endTime')
     .optional()
     .isISO8601().withMessage('EndTime must be valid ISO8601 date'),
-  
+
+  // Coerce "true"/"false" query strings to a real boolean (never rejects).
   query('errorOnly')
     .optional()
-    .isBoolean().withMessage('ErrorOnly must be true or false'),
+    .customSanitizer((value) => value === true || value === 'true'),
   
   query('limit')
     .optional()

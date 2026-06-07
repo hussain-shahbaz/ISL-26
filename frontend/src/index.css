@@ -50,6 +50,29 @@
   color-scheme: dark;
 }
 
+/* Auth form panel is always light (the brand split looks best that way),
+   regardless of the global theme. Re-applies the light token values. */
+.auth-light {
+  --background: #f6f7fb;
+  --surface: #ffffff;
+  --surface-2: #eef1f7;
+  --surface-3: #e6eaf3;
+  --foreground: #0b1220;
+  --muted: #586074;
+  --border: #e1e6f0;
+  --ring: #19b8e6;
+
+  --brand: #0bbbe4;
+  --brand-strong: #0a93b4;
+  --integrity: #12b886;
+  --exam: #3b82f6;
+  --proctor: #f59f0a;
+  --risk: #f4476b;
+
+  --shadow-color: 220 40% 16%;
+  color-scheme: light;
+}
+
 @theme inline {
   --font-display: "Clash Display", "Satoshi", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "Satoshi", ui-sans-serif, system-ui, sans-serif;
