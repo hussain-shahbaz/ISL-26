@@ -15,6 +15,11 @@ import {
   ArrowRight,
   Lock,
   Layers,
+  KeyRound,
+  Gauge,
+  RefreshCw,
+  Server,
+  EyeOff,
 } from 'lucide-react';
 import { Navbar } from '@/components/marketing/Navbar';
 import { Reveal } from '@/components/marketing/Reveal';
@@ -72,6 +77,39 @@ const databases = [
   { icon: Activity, name: 'Redis', role: 'Sessions, OTP & rate limits', tone: 'risk' as const },
   { icon: BrainCircuit, name: 'ChromaDB', role: 'Semantic plagiarism vectors', tone: 'brand' as const },
   { icon: Network, name: 'Neo4j', role: 'Collusion graph analytics', tone: 'proctor' as const },
+];
+
+const security = [
+  {
+    icon: Lock,
+    title: 'Edge authentication',
+    body: 'The gateway verifies the JWT once, strips any inbound identity headers, and re-injects a trusted identity so services never trust the client directly.',
+  },
+  {
+    icon: KeyRound,
+    title: 'Role-based access control',
+    body: 'Student, teacher and admin scopes are enforced at the gateway and again inside each service. Privileged routes simply cannot be reached out of role.',
+  },
+  {
+    icon: Gauge,
+    title: 'Brute-force defense',
+    body: 'Per-route rate limiting and login lockout return HTTP 429, while OTP attempts are capped and temporarily blocked after repeated failures.',
+  },
+  {
+    icon: RefreshCw,
+    title: 'Session hygiene',
+    body: 'Short-lived access tokens, device-bound sessions and refresh rotation. Changing a password revokes every active session instantly.',
+  },
+  {
+    icon: Server,
+    title: 'Zero-trust between services',
+    body: 'Service-to-service calls carry a shared secret, and registration-style operations are restricted to internal-only routes.',
+  },
+  {
+    icon: EyeOff,
+    title: 'Data minimization',
+    body: 'Passwords and tokens are bcrypt-hashed, and sensitive fields are redacted before anything is ever written to the audit log.',
+  },
 ];
 
 const flow = [
@@ -261,6 +299,36 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ---------------- Security / defense in depth ---------------- */}
+      <section id="security" className="border-y border-border bg-surface/40 px-5 py-24">
+        <div className="mx-auto max-w-6xl">
+          <Reveal className="mx-auto max-w-2xl text-center">
+            <Badge tone="risk" className="mb-4">Defense in depth</Badge>
+            <h2 className="text-4xl font-bold md:text-5xl">Security at every layer</h2>
+            <p className="mt-4 text-muted">
+              Not a single gate, but overlapping controls from the browser to the database, so no
+              one mistake becomes a breach.
+            </p>
+          </Reveal>
+
+          <div className="mt-14 grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+            {security.map((item, i) => (
+              <Reveal key={item.title} delay={i * 0.05}>
+                <div className="flex gap-4">
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-border bg-surface">
+                    <item.icon size={20} className="text-brand" />
+                  </span>
+                  <div>
+                    <h3 className="font-semibold">{item.title}</h3>
+                    <p className="mt-1.5 text-sm text-muted">{item.body}</p>
+                  </div>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ---------------- Architecture / databases ---------------- */}
       <section id="architecture" className="px-5 py-24">
         <div className="mx-auto max-w-6xl">
@@ -342,11 +410,74 @@ export default function LandingPage() {
       </section>
 
       {/* ---------------- Footer ---------------- */}
-      <footer className="border-t border-border px-5 py-10">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 text-sm text-muted md:flex-row">
-          <Logo />
-          <p>Secure Online Examination System · Built for IS & ADBMS</p>
-          <p className="font-mono text-xs">© {new Date().getFullYear()} ExamPro</p>
+      <footer className="border-t border-border px-5 pb-10 pt-14">
+        <div className="mx-auto max-w-6xl">
+          <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr_1.2fr]">
+            <div>
+              <Logo />
+              <p className="mt-4 max-w-xs text-sm text-muted">
+                A security-first online examination system: verified identity, live proctoring,
+                tamper-evident auditing and AI grading.
+              </p>
+              <p className="mt-4 inline-flex items-center gap-2 text-xs text-muted">
+                <ShieldCheck size={14} className="text-integrity" /> Built for IS & ADBMS
+              </p>
+            </div>
+
+            {[
+              {
+                title: 'Platform',
+                links: [
+                  { label: 'Capabilities', href: '#platform' },
+                  { label: 'Integrity', href: '#integrity' },
+                  { label: 'Security', href: '#security' },
+                  { label: 'Architecture', href: '#architecture' },
+                ],
+              },
+              {
+                title: 'Get started',
+                links: [
+                  { label: 'Create account', href: '/register' },
+                  { label: 'Sign in', href: '/login' },
+                  { label: 'Exam journey', href: '#flow' },
+                ],
+              },
+            ].map((col) => (
+              <div key={col.title}>
+                <p className="text-sm font-semibold">{col.title}</p>
+                <ul className="mt-4 space-y-2.5">
+                  {col.links.map((l) => (
+                    <li key={l.label}>
+                      <a href={l.href} className="text-sm text-muted transition-colors hover:text-foreground">
+                        {l.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+
+            <div>
+              <p className="text-sm font-semibold">Built with</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {['React', 'Node.js', 'Docker', 'PostgreSQL', 'MongoDB', 'Redis', 'ChromaDB', 'Neo4j'].map(
+                  (tech) => (
+                    <span
+                      key={tech}
+                      className="rounded-md border border-border bg-surface-2/50 px-2 py-1 text-xs text-muted"
+                    >
+                      {tech}
+                    </span>
+                  ),
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-border pt-6 text-sm text-muted md:flex-row">
+            <p>Secure Online Examination System</p>
+            <p className="font-mono text-xs">© {new Date().getFullYear()} ExamPro. All rights reserved.</p>
+          </div>
         </div>
       </footer>
     </div>
