@@ -21,10 +21,13 @@ class ExamValidator {
       errors.push('totalMarks is required and must be a positive integer');
     }
 
+    // A new exam is a DRAFT, so we only require a valid scheduledTime here.
+    // The "must be in the future" rule is enforced at publish time, not while
+    // drafting (a teacher may draft with any tentative time).
     if (!body.scheduledTime) {
       errors.push('scheduledTime is required');
-    } else if (new Date(body.scheduledTime) <= new Date()) {
-      errors.push('scheduledTime must be a future date');
+    } else if (Number.isNaN(new Date(body.scheduledTime).getTime())) {
+      errors.push('scheduledTime must be a valid date');
     }
 
     if (!body.timeAllowed || !Number.isInteger(body.timeAllowed) || body.timeAllowed <= 0) {

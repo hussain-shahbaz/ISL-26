@@ -72,12 +72,15 @@ export function unwrap<T>(payload: unknown): T {
 
 export function apiErrorMessage(error: unknown, fallback = 'Something went wrong'): string {
   if (axios.isAxiosError(error)) {
-    return (
-      error.response?.data?.message ||
-      error.response?.data?.error ||
-      error.message ||
-      fallback
-    );
+    const data = error.response?.data as
+      | { message?: string; error?: string; errors?: unknown }
+      | undefined;
+    // Some services (e.g. exam) return a validation `errors` array with the
+    // real reasons — surface those instead of a generic status message.
+    if (data && Array.isArray(data.errors) && data.errors.length) {
+      return data.errors.join('; ');
+    }
+    return data?.message || data?.error || error.message || fallback;
   }
   return fallback;
 }
