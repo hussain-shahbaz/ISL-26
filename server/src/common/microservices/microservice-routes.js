@@ -1,5 +1,15 @@
 const express = require('express');
 const axios = require('axios');
+const { requireRole } = require('../middleware/auth');
+
+// Role guard that always lets health checks through (they are public).
+function guard(...roles) {
+  const check = requireRole(...roles);
+  return (req, res, next) => {
+    if (req.path.endsWith('/health')) return next();
+    return check(req, res, next);
+  };
+}
 
 class MicroserviceRoutes {
   constructor() {
@@ -44,11 +54,11 @@ class MicroserviceRoutes {
     // Route: /api/modules/student-exam/*
     this.router.use('/student-exam', this._createProxyHandler(this.microservices.studentExam));
 
-    // Route: /api/modules/grade-cheat/*
-    this.router.use('/grade-cheat', this._createProxyHandler(this.microservices.gradeCheat));
+    // Route: /api/modules/grade-cheat/* — grading is teacher/admin only.
+    this.router.use('/grade-cheat', guard('teacher', 'admin'), this._createProxyHandler(this.microservices.gradeCheat));
 
-    // Route: /api/modules/log/*
-    this.router.use('/log', this._createProxyHandler(this.microservices.log));
+    // Route: /api/modules/log/* — the audit log is admin only.
+    this.router.use('/log', guard('admin'), this._createProxyHandler(this.microservices.log));
   }
 
   /**
