@@ -19,6 +19,7 @@ const ExamRunnerPage = lazy(() => import('@/pages/app/ExamRunner'));
 const ResultsPage = lazy(() => import('@/pages/app/Results'));
 const UsersPage = lazy(() => import('@/pages/app/Users'));
 const AuditPage = lazy(() => import('@/pages/app/Audit'));
+const RiskPage = lazy(() => import('@/pages/app/Risk'));
 
 export default function App() {
   return (
@@ -80,6 +81,14 @@ export default function App() {
             element={
               <ProtectedRoute roles={['admin']}>
                 <AuditPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="risk"
+            element={
+              <ProtectedRoute roles={['admin']}>
+                <RiskPage />
               </ProtectedRoute>
             }
           />

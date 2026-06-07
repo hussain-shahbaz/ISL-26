@@ -1,0 +1,15 @@
+{
+  "name": "risk-service",
+  "version": "1.0.0",
+  "description": "Graph-based exam integrity analytics (collusion rings, shared devices, multi-session) backed by Neo4j.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js",
+    "seed": "node src/seed.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "neo4j-driver": "^5.28.1"
+  }
+}

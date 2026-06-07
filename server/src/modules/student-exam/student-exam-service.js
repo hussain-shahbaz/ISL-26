@@ -1,6 +1,7 @@
 const studentExamRepository = require('./student-exam-repository');
 const SubmitExamValidator = require('./student-exam-validator');
 const dataProvider = require('./data-provider');
+const { emitSubmission } = require('./risk-provider');
 
 class StudentExamService {
   // The exam-service enforces published/started/enrolled rules for students.
@@ -26,7 +27,9 @@ class StudentExamService {
       throw new Error('Exam has already been submitted by this student');
     }
 
-    return await studentExamRepository.createSubmission(submissionData);
+    const saved = await studentExamRepository.createSubmission(submissionData);
+    emitSubmission(studentId, examId); // link into the risk graph (best-effort)
+    return saved;
   }
 
   async getAllExams(studentId) {

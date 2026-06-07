@@ -8,6 +8,7 @@ import {
   Award,
   Users,
   ScrollText,
+  Workflow,
   Settings,
   LogOut,
   Menu,
@@ -45,6 +46,7 @@ const navByRole: Record<Role, NavItem[]> = {
     { to: '/app', label: 'Dashboard', icon: LayoutDashboard, end: true },
     { to: '/app/users', label: 'Users', icon: Users },
     { to: '/app/audit', label: 'Audit log', icon: ScrollText },
+    { to: '/app/risk', label: 'Integrity graph', icon: Workflow },
   ],
 };
 

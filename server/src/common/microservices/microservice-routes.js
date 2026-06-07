@@ -38,6 +38,10 @@ class MicroserviceRoutes {
       log: {
         baseUrl: process.env.LOG_SERVICE_URL || 'http://localhost:3006',
         baseApiPath: '/logs'
+      },
+      risk: {
+        baseUrl: process.env.RISK_SERVICE_URL || 'http://localhost:3007',
+        baseApiPath: '/risk'
       }
     };
 
@@ -59,6 +63,9 @@ class MicroserviceRoutes {
 
     // Route: /api/modules/log/* — the audit log is admin only.
     this.router.use('/log', guard('admin'), this._createProxyHandler(this.microservices.log));
+
+    // Route: /api/modules/risk/* — graph integrity analytics, teacher/admin only.
+    this.router.use('/risk', guard('teacher', 'admin'), this._createProxyHandler(this.microservices.risk));
   }
 
   /**

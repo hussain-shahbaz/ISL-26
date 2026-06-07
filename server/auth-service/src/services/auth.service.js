@@ -13,6 +13,7 @@ import {
   verifyRefreshToken,
 } from "../utils/jwt.js";
 import userServiceHttp from "../http/userService.http.js";
+import riskHttp from "../http/risk.http.js";
 const authRepo = new AuthRepository();
 const sessionRepo = new SessionRepository();
 const emailService = new EmailService();
@@ -119,6 +120,17 @@ export class AuthService {
       deviceFingerprint: meta.deviceFingerprint,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     });
+
+    // Feed the integrity graph (students only). Uses the privacy-preserving
+    // device fingerprint hash, not the raw value. Best-effort, never blocks login.
+    if (user.role === "student") {
+      riskHttp.emitLogin({
+        studentId: user.userId,
+        deviceFingerprint: deviceFingerprintHash,
+        ip: meta.ipAddress,
+      });
+    }
+
     return { accessToken, refreshToken, user };
   }
   async verifyEmail(body) {
