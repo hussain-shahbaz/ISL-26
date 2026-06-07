@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ShieldCheck, ShieldX, Search, RefreshCw, FileSearch } from 'lucide-react';
-import { queryLogs, verifyChain, type LogEntry } from '@/features/logs/api';
+import { queryLogs, verifyChain, type LogEntry } from '@/features/audit/api';
 import { PageHeader, EmptyState, ErrorState, Skeleton } from '@/components/app/widgets';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
