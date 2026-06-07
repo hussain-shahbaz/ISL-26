@@ -71,6 +71,56 @@ export function StatCard({
   );
 }
 
+const toneVar = {
+  brand: 'var(--brand)',
+  integrity: 'var(--integrity)',
+  exam: 'var(--exam)',
+  proctor: 'var(--proctor)',
+  risk: 'var(--risk)',
+} as const;
+
+export interface Segment {
+  label: string;
+  value: number;
+  tone: keyof typeof toneVar;
+}
+
+/** A compact stacked distribution bar with legend, computed from real counts. */
+export function DistributionBar({ title, segments }: { title?: string; segments: Segment[] }) {
+  const total = segments.reduce((a, s) => a + s.value, 0);
+  const safe = total || 1;
+  return (
+    <div className="rounded-2xl border border-border bg-surface p-5">
+      {title && (
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-sm font-medium">{title}</p>
+          <span className="text-xs text-muted">{total} total</span>
+        </div>
+      )}
+      <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-surface-2">
+        {segments.map((s) =>
+          s.value > 0 ? (
+            <div
+              key={s.label}
+              className="h-full transition-all"
+              style={{ width: `${(s.value / safe) * 100}%`, background: toneVar[s.tone] }}
+            />
+          ) : null,
+        )}
+      </div>
+      <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2">
+        {segments.map((s) => (
+          <div key={s.label} className="flex items-center gap-2 text-sm">
+            <span className="h-2.5 w-2.5 rounded-full" style={{ background: toneVar[s.tone] }} />
+            <span className="text-muted">{s.label}</span>
+            <span className="font-medium tabular-nums">{s.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function EmptyState({
   title,
   description,

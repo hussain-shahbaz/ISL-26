@@ -1,9 +1,17 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { FileText, Send, FileEdit, CheckCircle2, PlusCircle } from 'lucide-react';
+import { FileText, Send, FileEdit, CheckCircle2, PlusCircle, ArrowRight } from 'lucide-react';
 import { listTeacherExams } from '@/features/exams/api';
-import { PageHeader, StatCard, EmptyState, ErrorState, CardGridSkeleton } from '@/components/app/widgets';
+import {
+  PageHeader,
+  StatCard,
+  EmptyState,
+  ErrorState,
+  CardGridSkeleton,
+  DistributionBar,
+} from '@/components/app/widgets';
 import { ExamCard } from '@/features/exams/components';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/auth';
 
@@ -15,6 +23,9 @@ export default function TeacherDashboard() {
   });
 
   const list = exams ?? [];
+  const drafts = list.filter((e) => e.status === 'draft');
+  const published = list.filter((e) => e.status === 'published');
+  const graded = list.filter((e) => e.status === 'checked');
 
   return (
     <div>
@@ -32,9 +43,35 @@ export default function TeacherDashboard() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Total exams" value={list.length} icon={FileText} accent="exam" />
-        <StatCard label="Drafts" value={list.filter((e) => e.status === 'draft').length} icon={FileEdit} accent="brand" delay={0.05} />
-        <StatCard label="Published" value={list.filter((e) => e.status === 'published').length} icon={Send} accent="proctor" delay={0.1} />
-        <StatCard label="Graded" value={list.filter((e) => e.status === 'checked').length} icon={CheckCircle2} accent="integrity" delay={0.15} />
+        <StatCard label="Drafts" value={drafts.length} icon={FileEdit} accent="brand" delay={0.05} />
+        <StatCard label="Published" value={published.length} icon={Send} accent="proctor" delay={0.1} />
+        <StatCard label="Graded" value={graded.length} icon={CheckCircle2} accent="integrity" delay={0.15} />
+      </div>
+
+      <div className="mt-8 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+        <DistributionBar
+          title="Exam lifecycle"
+          segments={[
+            { label: 'Drafts', value: drafts.length, tone: 'brand' },
+            { label: 'Published', value: published.length, tone: 'proctor' },
+            { label: 'Graded', value: graded.length, tone: 'integrity' },
+          ]}
+        />
+        <Card>
+          <CardContent className="flex h-full flex-col justify-between p-5">
+            <div>
+              <p className="text-sm font-medium">Needs attention</p>
+              <p className="mt-1 text-sm text-muted">
+                {drafts.length > 0
+                  ? `${drafts.length} draft${drafts.length > 1 ? 's' : ''} not yet published to students.`
+                  : 'All your exams are published. Nothing waiting.'}
+              </p>
+            </div>
+            <Link to="/app/exams" className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-brand hover:underline">
+              Review exams <ArrowRight size={15} />
+            </Link>
+          </CardContent>
+        </Card>
       </div>
 
       <section className="mt-10">

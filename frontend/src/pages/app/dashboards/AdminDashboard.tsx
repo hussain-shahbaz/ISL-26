@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Users, UserCheck, GraduationCap, ShieldCheck, ScrollText, Loader2 } from 'lucide-react';
 import { getPendingInstructors, getInstructors, getStudents } from '@/features/admin/api';
 import { verifyChain } from '@/features/audit/api';
-import { PageHeader, StatCard, ErrorState } from '@/components/app/widgets';
+import { PageHeader, StatCard, ErrorState, DistributionBar } from '@/components/app/widgets';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,6 +45,17 @@ export default function AdminDashboard() {
         <StatCard label="Pending approvals" value={pending.data?.length ?? '—'} icon={UserCheck} accent="proctor" />
         <StatCard label="Instructors" value={instructors.data?.length ?? '—'} icon={Users} accent="exam" delay={0.05} />
         <StatCard label="Students" value={students.data?.length ?? '—'} icon={GraduationCap} accent="brand" delay={0.1} />
+      </div>
+
+      <div className="mt-8">
+        <DistributionBar
+          title="Community"
+          segments={[
+            { label: 'Students', value: students.data?.length ?? 0, tone: 'brand' },
+            { label: 'Instructors', value: instructors.data?.length ?? 0, tone: 'exam' },
+            { label: 'Pending approval', value: pending.data?.length ?? 0, tone: 'proctor' },
+          ]}
+        />
       </div>
 
       <div className="mt-8 grid gap-4 lg:grid-cols-2">
