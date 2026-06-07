@@ -11,7 +11,8 @@
     "test:smoke": "node tests/smoke.test.js",
     "log": "nodemon --env-file=../.env src/modules/log/app.js",
     "exam": "nodemon --env-file=../.env src/modules/exam/server.js",
-    "submission": "nodemon --env-file=../.env src/modules/student-exam/server.js"
+    "submission": "nodemon --env-file=../.env src/modules/student-exam/server.js",
+    "risk": "nodemon --env-file=../.env risk-service/src/server.js"
   },
   "keywords": [],
   "author": "",

@@ -11,11 +11,12 @@ server/
 ├── app.js                 # API gateway (entry point, :3000)
 ├── auth-service/          # authentication (attached in-process to the gateway)
 ├── user-service/          # user profiles & RBAC (:3002)
-├── docs/                  # integration, testing and architecture references
+├── risk-service/          # Neo4j collusion graph analytics (:3007)
+├── docs/                  # integration, API reference, testing, architecture
 └── src/
     ├── common/
     │   ├── microservices/ # reverse-proxy router (/api/modules/*)
-    │   ├── middleware/    # async audit-logging middleware
+    │   ├── middleware/    # gateway auth + async audit-logging middleware
     │   └── queue/         # non-blocking log queue
     └── modules/
         ├── exam/          # exam & question authoring (:3003)
@@ -45,6 +46,14 @@ npm run dev          # gateway + auth-service        -> http://localhost:3000
 npm run log          # log-service                   -> http://localhost:3006
 npm run exam         # exam-service                  -> http://localhost:3003
 npm run submission   # student-exam service          -> http://localhost:3004
+npm run risk         # risk-service (Neo4j)          -> http://localhost:3007
+```
+
+user-service and risk-service are standalone packages — install their deps once:
+
+```bash
+cd user-service && npm install && npm run dev   # -> http://localhost:3002
+cd risk-service && npm install && npm start      # -> http://localhost:3007 (needs Neo4j)
 ```
 
 The grade-cheat service is Python:
@@ -83,4 +92,6 @@ npm run health                               # checks all services
 
 ## Reference docs
 
-Service-level references live in [`docs/`](./docs): integration guide, microservice testing, architecture diagrams, and the original implementation notes. Module-specific notes live alongside each module (e.g. `src/modules/log/README.md`).
+- **[`docs/API.md`](./docs/API.md)** — full API reference for every service and how they communicate (headers, trust model, JWT contract).
+- [`docs/`](./docs) — integration guide, microservice testing, architecture diagrams.
+- Module-specific notes live alongside each module (e.g. `src/modules/log/README.md`, `risk-service/README.md`).
