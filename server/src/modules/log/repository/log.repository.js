@@ -250,8 +250,11 @@ class LogRepository {
       const query = { service };
       if (environment) query.environment = environment;
 
+      // Order by insertion (_id), not the gateway timestamp. Timestamps can tie
+      // to the millisecond or arrive slightly out of order, which would fork the
+      // hash chain; _id is monotonic per process and matches append order.
       const log = await Log.findOne(query)
-        .sort({ timestamp: -1 })
+        .sort({ _id: -1 })
         .lean();
       return log;
     } catch (error) {

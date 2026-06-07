@@ -77,6 +77,12 @@ export class AuthService {
     if (!user.isEmailVerified) {
       throw new Error("Please verify your email");
     }
+
+    // Resolve the instructor's live approval state and carry it in the token so
+    // the gateway/downstream services can enforce it. Non-instructors are always
+    // "APPROVED"; on a user-service hiccup we fail open to avoid locking people out.
+    const approvalStatus = await this._resolveApprovalStatus(user);
+
     const activeSessionCount = await sessionRepo.getActiveSessionCount(
       user.userId
     );
@@ -98,6 +104,7 @@ export class AuthService {
       userId: user.userId,
       username: user.email,
       role: user.role,
+      approval_status: approvalStatus,
       session_id: sessionId,
       sessionId,
       device_fingerprint_hash: deviceFingerprintHash,
@@ -212,6 +219,15 @@ export class AuthService {
       message: "Email verified successfully.",
     };
   }
+  // Instructors must be APPROVED; everyone else is implicitly approved. On a
+  // user-service error we return "APPROVED" (fail open) so a transient outage
+  // doesn't lock out legitimate users — the frontend gate is the backstop.
+  async _resolveApprovalStatus(user) {
+    if (String(user.role).toLowerCase() !== "instructor") return "APPROVED";
+    const info = await userServiceHttp.getApprovalStatus(user.userId);
+    return info?.approvalStatus || "APPROVED";
+  }
+
   async refresh(refreshToken) {
     const decoded = verifyRefreshToken(refreshToken);
     const session = await sessionRepo.findActiveBySessionId(decoded.sessionId);
@@ -219,11 +235,14 @@ export class AuthService {
     const matched = await compareHash(refreshToken, session.refreshTokenHash);
     if (!matched) throw new Error("Invalid refresh token");
     const user = await authRepo.findByUserId(decoded.userId);
+    // Re-resolve approval so changes take effect within the 15m token lifetime.
+    const approvalStatus = await this._resolveApprovalStatus(user);
     return generateAccessToken({
       user_id: user.userId,
       userId: user.userId,
       username: user.email,
       role: user.role,
+      approval_status: approvalStatus,
       session_id: session.sessionId,
       sessionId: session.sessionId,
       jti: crypto.randomUUID(),

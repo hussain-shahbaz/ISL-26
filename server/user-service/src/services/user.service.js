@@ -105,11 +105,13 @@ class UserService {
     });
   }
 
-  async getPendingUsers({ university, page, limit }) {
+  async getPendingUsers({ page, limit }) {
+    // Pending instructors are NOT university-scoped: a freshly registered
+    // instructor has no university set yet, so filtering by the admin's
+    // university would hide every account awaiting approval.
     return await userRepository.findUsers({
       role: "INSTRUCTOR",
       approvalStatus: "PENDING",
-      university,
       page,
       limit,
     });

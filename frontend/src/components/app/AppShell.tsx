@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
 import {
   LayoutDashboard,
   FileText,
@@ -19,12 +20,19 @@ import {
   Lock,
   Activity,
   CircleHelp,
+  Clock,
+  ShieldAlert,
+  RefreshCw,
 } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
+import { refreshAccessToken } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { logout as apiLogout } from '@/features/auth/api';
+import { getMyProfile } from '@/features/admin/api';
 import { initialsOf, cn } from '@/lib/utils';
 import type { Role } from '@/types';
 
@@ -298,6 +306,109 @@ function UserMenu() {
   );
 }
 
+// Full-screen notice shown when an instructor's account isn't approved yet.
+// It deliberately replaces the page content so unapproved teachers can't reach
+// any feature; the backend still owns the authoritative checks.
+function ApprovalNotice({
+  status,
+  onRecheck,
+  rechecking,
+}: {
+  status: 'PENDING' | 'REJECTED';
+  onRecheck: () => void;
+  rechecking: boolean;
+}) {
+  const navigate = useNavigate();
+  const clear = useAuthStore((s) => s.clear);
+  const rejected = status === 'REJECTED';
+
+  async function onSignOut() {
+    await apiLogout();
+    clear();
+    navigate('/login', { replace: true });
+  }
+
+  return (
+    <div className="mx-auto flex max-w-lg flex-col items-center py-16 text-center">
+      <span
+        className={cn(
+          'grid h-16 w-16 place-items-center rounded-2xl border',
+          rejected
+            ? 'border-risk/40 bg-[color-mix(in_oklab,var(--risk)_12%,transparent)] text-risk'
+            : 'border-proctor/40 bg-[color-mix(in_oklab,var(--proctor)_12%,transparent)] text-proctor',
+        )}
+      >
+        {rejected ? <ShieldAlert size={28} /> : <Clock size={28} />}
+      </span>
+      <h2 className="mt-5 text-xl font-semibold">
+        {rejected ? 'Your instructor account was declined' : 'Your account is awaiting approval'}
+      </h2>
+      <p className="mt-2 text-sm text-muted">
+        {rejected
+          ? 'An administrator has declined this instructor account, so teaching features are disabled. If you believe this is a mistake, please contact your administrator.'
+          : 'An administrator must approve your instructor account before you can create or manage exams. You will get full access as soon as it is approved.'}
+      </p>
+      <div className="mt-4 flex items-center gap-2">
+        <Badge tone={rejected ? 'risk' : 'proctor'} className="capitalize">
+          {status.toLowerCase()}
+        </Badge>
+        <span className="text-xs text-muted">Instructor</span>
+      </div>
+      <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+        {!rejected && (
+          <Button variant="outline" onClick={onRecheck} disabled={rechecking}>
+            {rechecking ? <Spinner /> : <RefreshCw size={15} />} Check again
+          </Button>
+        )}
+        <Button variant="ghost" onClick={onSignOut}>
+          <LogOut size={15} /> Sign out
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// Gates the workspace for instructors. Students/admins pass through untouched.
+// Account settings stay reachable so a pending teacher can still secure or sign
+// out of their account.
+function ApprovalGate({ role, children }: { role: Role; children: React.ReactNode }) {
+  const { pathname } = useLocation();
+  const enabled = role === 'teacher';
+
+  const { data, isLoading, refetch, isFetching } = useQuery({
+    queryKey: ['my-profile'],
+    queryFn: getMyProfile,
+    enabled,
+    staleTime: 60_000,
+  });
+
+  // Re-check approval and, if it just flipped to approved, refresh the token so
+  // it carries the new claim immediately (the exam APIs trust the token).
+  async function recheck() {
+    const { data: fresh } = await refetch();
+    if (fresh?.approvalStatus === 'APPROVED') {
+      await refreshAccessToken();
+    }
+  }
+
+  if (!enabled || pathname === '/app/settings') return <>{children}</>;
+
+  if (isLoading) {
+    return (
+      <div className="grid place-items-center py-24">
+        <Spinner />
+      </div>
+    );
+  }
+
+  const status = data?.approvalStatus;
+  if (status === 'PENDING' || status === 'REJECTED') {
+    return <ApprovalNotice status={status} onRecheck={recheck} rechecking={isFetching} />;
+  }
+
+  return <>{children}</>;
+}
+
 export function AppShell() {
   const role = useAuthStore((s) => s.user?.role) ?? 'student';
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -380,7 +491,9 @@ export function AppShell() {
         </header>
 
         <main className="mx-auto max-w-6xl px-5 py-7">
-          <Outlet />
+          <ApprovalGate role={role}>
+            <Outlet />
+          </ApprovalGate>
         </main>
       </div>
     </div>

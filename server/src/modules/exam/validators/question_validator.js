@@ -20,8 +20,10 @@ class QuestionValidator {
     }
 
     if (body.type === 'mcq') {
-      if (!body.options || !Array.isArray(body.options) || body.options.length !== 4) {
-        errors.push('mcq must have exactly 4 options');
+      if (!body.options || !Array.isArray(body.options) || body.options.length < 2 || body.options.length > 6) {
+        errors.push('mcq must have between 2 and 6 options');
+      } else if (body.options.some((o) => !o || String(o).trim() === '')) {
+        errors.push('mcq options cannot be empty');
       }
     }
 
@@ -48,8 +50,8 @@ class QuestionValidator {
     }
 
     if (body.type === 'mcq' && body.options !== undefined) {
-      if (!Array.isArray(body.options) || body.options.length !== 4) {
-        errors.push('mcq must have exactly 4 options');
+      if (!Array.isArray(body.options) || body.options.length < 2 || body.options.length > 6) {
+        errors.push('mcq must have between 2 and 6 options');
       }
     }
 

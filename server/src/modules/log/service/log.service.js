@@ -1,10 +1,29 @@
 // Business logic for logging - sanitizes data, manages hash chain, calls repository
 
 const LogRepository = require('../repository/log.repository');
+const Log = require('../model/log.model');
 const { sanitize } = require('../utils/sanitizer');
 const { verifyHash,calculateLogHash } = require('../utils/hash-utils');
 const logger = require('../utils/logger');
 const config = require('../config/config');
+
+// Per-(service, environment) write lock. The hash chain reads the latest log
+// then appends; without serialization, concurrent requests would read the same
+// "previous" log and fork the chain. This keeps appends strictly sequential
+// within the single log-service process.
+const _chainLocks = new Map();
+function withChainLock(key, fn) {
+  const prev = _chainLocks.get(key) || Promise.resolve();
+  const run = prev.then(fn, fn);
+  _chainLocks.set(
+    key,
+    run.then(
+      () => {},
+      () => {},
+    ),
+  );
+  return run;
+}
 
 class LogService {
   // Single definition of the data covered by the hash chain. Used by both
@@ -64,25 +83,37 @@ class LogService {
         error: logData.error ? sanitize(logData.error) : null,
       };
       
-      const previousLog = await LogRepository.getLastLog(
-        logData.service,
-        logData.environment
-      );
+      // Serialize the read-previous -> compute-hash -> save sequence so
+      // concurrent requests can't fork the chain off the same predecessor.
+      const lockKey = `${logData.service}::${logData.environment}`;
+      const saved = await withChainLock(lockKey, async () => {
+        // Build the document first so Mongoose applies its schema defaults
+        // (e.g. request.query/params default to {}). We MUST hash exactly what
+        // gets persisted, otherwise verification recomputes a different payload
+        // (null vs {}) and reports a false "hash integrity" failure.
+        const doc = new Log(sanitized);
 
-      // Data covered by the hash chain (excludes the hash fields themselves).
-      const logDataForHashing = this._hashPayload(sanitized);
+        const previousLog = await LogRepository.getLastLog(
+          logData.service,
+          logData.environment
+        );
 
-      if (previousLog) {
-        sanitized.previousHash = previousLog.currentHash;
-      } else {
-        // Genesis: previousHash is special marker
-        sanitized.previousHash = calculateLogHash(config.GENESIS_MARKER + '-' + logData.service, config.GENESIS_MARKER);
-      }
+        if (previousLog) {
+          doc.previousHash = previousLog.currentHash;
+        } else {
+          // Genesis: deterministic marker so the anchor is reproducible.
+          doc.previousHash = calculateLogHash(
+            config.GENESIS_MARKER + '-' + logData.service,
+            config.GENESIS_MARKER
+          );
+        }
 
-      // Calculate currentHash ONLY from previousHash + logData (not including hash fields)
-      sanitized.currentHash = calculateLogHash(sanitized.previousHash, logDataForHashing);
+        // Hash the post-default representation (what actually lands in Mongo).
+        const logDataForHashing = this._hashPayload(doc.toObject());
+        doc.currentHash = calculateLogHash(doc.previousHash, logDataForHashing);
 
-      const saved = await LogRepository.create(sanitized);
+        return doc.save();
+      });
 
       logger.info(`Log created: ${saved._id}`);
       return {
@@ -184,10 +215,16 @@ class LogService {
 
   async verifyChainIntegrity(service, environment) {
     try {
-      const result = await LogRepository.findByService(service, {
-        limit: 10000,
+      // The chain is built per (service, environment); verify within the same
+      // scope. Walk in insertion order (_id) — the exact order links were
+      // appended — so timestamp ties or skew can't produce false breaks.
+      const filters = { service };
+      if (environment) filters.environment = environment;
+
+      const result = await LogRepository.query(filters, {
+        limit: 100000,
         skip: 0,
-        sort: { timestamp: 1 },
+        sort: { _id: 1 },
       });
 
       const logs = result.data;

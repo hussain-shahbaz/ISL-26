@@ -34,6 +34,25 @@ class UserServiceHttp {
     }
   }
 
+  // Live approval state for embedding into the access token. Returns null on any
+  // failure so the caller can decide how to degrade (we fail open on transport
+  // errors to avoid locking out legitimate users during a user-service blip).
+  async getApprovalStatus(userId) {
+    try {
+      const response = await userServiceClient.get(
+        `/api/users/internal/${userId}/approval`
+      );
+      return response.data?.data || null; // { role, approvalStatus }
+    } catch (error) {
+      console.error(
+        "getApprovalStatus failed:",
+        error.response?.status,
+        error.message
+      );
+      return null;
+    }
+  }
+
   // called if auth record creation fails after profile created
   async rollbackProfile(userId) {
     try {

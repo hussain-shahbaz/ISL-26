@@ -10,6 +10,10 @@ class ExamAuthMiddleware {
       if (req.user.role !== ROLES.TEACHER) {
         return res.status(403).json({ status: 'error', message: 'Only teachers can access this' });
       }
+      // Unapproved instructors can't mutate exams (update/delete/status) either.
+      if (req.user.approvalStatus !== 'APPROVED') {
+        return res.status(403).json({ status: 'error', message: 'Your instructor account is pending administrator approval.' });
+      }
       // jwt middleware ny pehly sy req.user set kr diya hoga
       const instructorId = req.user.userId;
 

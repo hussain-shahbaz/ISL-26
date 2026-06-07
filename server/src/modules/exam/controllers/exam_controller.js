@@ -10,6 +10,15 @@ class ExamController {
       return res.status(403).json({ status: 'error', message: 'Only teachers can create exams' });
     }
 
+    // Unapproved instructors must not create exams even if they call the API
+    // directly — the approval state is carried in the verified gateway identity.
+    if (req.user.approvalStatus !== 'APPROVED') {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Your instructor account is pending administrator approval.',
+      });
+    }
+
     req.body.instructorId = req.user.userId;
     // Teacher display name comes from the gateway-propagated identity.
     req.body.teacherName = req.user.username || req.user.userId;

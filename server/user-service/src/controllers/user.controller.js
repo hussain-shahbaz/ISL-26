@@ -370,6 +370,28 @@ class UserController {
     }
   }
 
+  // Internal-only: lets the auth-service read a user's live approval state so it
+  // can embed it in the access token at login/refresh. Service-secret protected.
+  async getApprovalStatus(req, res) {
+    try {
+      const { userId } = req.params;
+      const profile = await userService.getProfile(userId);
+      return res.status(200).json({
+        success: true,
+        data: { role: profile.role, approvalStatus: profile.approvalStatus },
+      });
+    } catch (error) {
+      if (error.message === "PROFILE_NOT_FOUND") {
+        return res.status(404).json({ success: false, message: "Profile not found" });
+      }
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
+    }
+  }
+
   async getInstructors(req, res) {
     try {
       const parsed = paginationSchema.safeParse(req.query);
@@ -417,11 +439,8 @@ class UserController {
       }
 
       const { page, limit } = parsed.data;
-      const adminId = req.user?.userId || req.user?.id || req.user?.sub;
-      const adminProfile = await userService.getProfile(adminId);
 
       const { users, total } = await userService.getPendingUsers({
-        university: adminProfile.university,
         page,
         limit,
       });

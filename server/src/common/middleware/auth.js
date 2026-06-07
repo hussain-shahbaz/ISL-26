@@ -31,6 +31,7 @@ function stripIdentityHeaders(req) {
   delete req.headers['x-user-role'];
   delete req.headers['x-session-id'];
   delete req.headers['x-username'];
+  delete req.headers['x-user-approval'];
 }
 
 function authenticate(req, res, next) {
@@ -59,6 +60,9 @@ function authenticate(req, res, next) {
       role: normalizeRole(decoded.role),
       sessionId: decoded.session_id || decoded.sessionId || '',
       username: decoded.username || decoded.email || '',
+      // Approval state is minted into the token by auth-service. Default to
+      // APPROVED so existing non-instructor flows are unaffected.
+      approvalStatus: decoded.approval_status || 'APPROVED',
     };
 
     req.user = user;
@@ -67,6 +71,7 @@ function authenticate(req, res, next) {
     req.headers['x-user-role'] = user.role || '';
     req.headers['x-session-id'] = user.sessionId;
     req.headers['x-username'] = user.username;
+    req.headers['x-user-approval'] = user.approvalStatus;
 
     next();
   } catch (err) {

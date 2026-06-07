@@ -36,3 +36,18 @@ export async function updateApproval(userId: string, status: 'APPROVED' | 'REJEC
   const res = await api.patch(`${BASE}/${userId}/approval`, { status });
   return res.data;
 }
+
+export interface MyProfile {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  isProfileComplete?: boolean;
+}
+
+/** The signed-in user's own profile from the user-service (carries approval state). */
+export async function getMyProfile(): Promise<MyProfile> {
+  const res = await api.get(`${BASE}/profile`);
+  return unwrap<MyProfile>(res.data);
+}

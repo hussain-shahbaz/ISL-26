@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, ListChecks, AlignLeft, Save } from 'lucide-react';
+import { Plus, Trash2, ListChecks, AlignLeft, Save, Check } from 'lucide-react';
 import { createExam, type CreateExamPayload, type StudentLite } from '@/features/exams/api';
 import { StudentPicker } from '@/features/exams/StudentPicker';
 import { PageHeader } from '@/components/app/widgets';
@@ -21,11 +21,20 @@ interface DraftQuestion {
   marks: number;
   questionText: string;
   options: string[];
+  correctIndex: number;
   referenceAnswer: string;
 }
 
 function emptyQuestion(): DraftQuestion {
-  return { id: crypto.randomUUID(), type: 'mcq', marks: 5, questionText: '', options: ['', ''], referenceAnswer: '' };
+  return {
+    id: crypto.randomUUID(),
+    type: 'mcq',
+    marks: 5,
+    questionText: '',
+    options: ['', '', '', ''],
+    correctIndex: 0,
+    referenceAnswer: '',
+  };
 }
 
 export default function CreateExamPage() {
@@ -58,7 +67,20 @@ export default function CreateExamPage() {
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!subject.trim()) return toast.error('Subject required');
-    if (questions.some((q) => !q.questionText.trim())) return toast.error('Every question needs text');
+
+    // Validate each question up front so the teacher gets a precise message
+    // instead of a generic 400 from the backend.
+    for (const [i, q] of questions.entries()) {
+      if (!q.questionText.trim()) return toast.error(`Question ${i + 1} needs text`);
+      if (q.type === 'mcq') {
+        const opts = q.options.map((o) => o.trim());
+        if (opts.length < 2) return toast.error(`Question ${i + 1}: add at least 2 options`);
+        if (opts.some((o) => !o)) return toast.error(`Question ${i + 1}: fill in every option`);
+        if (!opts[q.correctIndex]) return toast.error(`Question ${i + 1}: mark the correct option`);
+      } else if (!q.referenceAnswer.trim()) {
+        return toast.error(`Question ${i + 1}: add a reference answer for grading`);
+      }
+    }
 
     mutation.mutate({
       subject: subject.trim(),
@@ -67,13 +89,25 @@ export default function CreateExamPage() {
       timeAllowed: Number(timeAllowed),
       totalMarks,
       students: students.map((s) => s.id),
-      questions: questions.map((q) => ({
-        type: q.type,
-        marks: Number(q.marks),
-        questionText: q.questionText.trim(),
-        options: q.type === 'mcq' ? q.options.map((o) => o.trim()).filter(Boolean) : undefined,
-        referenceAnswer: q.referenceAnswer.trim() || undefined,
-      })),
+      questions: questions.map((q) => {
+        if (q.type === 'mcq') {
+          const options = q.options.map((o) => o.trim());
+          return {
+            type: 'mcq' as const,
+            marks: Number(q.marks),
+            questionText: q.questionText.trim(),
+            options,
+            // The chosen option's text is the grading key (referenceAnswer).
+            referenceAnswer: options[q.correctIndex],
+          };
+        }
+        return {
+          type: 'text' as const,
+          marks: Number(q.marks),
+          questionText: q.questionText.trim(),
+          referenceAnswer: q.referenceAnswer.trim(),
+        };
+      }),
     });
   }
 
@@ -167,8 +201,25 @@ export default function CreateExamPage() {
 
                   {q.type === 'mcq' ? (
                     <div className="mt-3 space-y-2">
+                      <p className="text-xs text-muted">
+                        Select the radio next to the correct answer.
+                      </p>
                       {q.options.map((opt, oi) => (
                         <div key={oi} className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => updateQuestion(q.id, { correctIndex: oi })}
+                            aria-label={`Mark option ${oi + 1} as correct`}
+                            title="Mark as correct answer"
+                            className={cn(
+                              'grid h-6 w-6 shrink-0 place-items-center rounded-full border transition-colors',
+                              q.correctIndex === oi
+                                ? 'border-integrity bg-integrity text-[#04121a]'
+                                : 'border-border text-transparent hover:border-integrity/60',
+                            )}
+                          >
+                            <Check size={13} strokeWidth={3} />
+                          </button>
                           <Input
                             value={opt}
                             onChange={(e) => {
@@ -177,11 +228,19 @@ export default function CreateExamPage() {
                               updateQuestion(q.id, { options });
                             }}
                             placeholder={`Option ${oi + 1}`}
+                            className={cn(q.correctIndex === oi && 'border-integrity/50')}
                           />
                           {q.options.length > 2 && (
                             <button
                               type="button"
-                              onClick={() => updateQuestion(q.id, { options: q.options.filter((_, i) => i !== oi) })}
+                              onClick={() => {
+                                const options = q.options.filter((_, i) => i !== oi);
+                                // Keep the correct marker pointing at the same option.
+                                let correctIndex = q.correctIndex;
+                                if (oi === q.correctIndex) correctIndex = 0;
+                                else if (oi < q.correctIndex) correctIndex = q.correctIndex - 1;
+                                updateQuestion(q.id, { options, correctIndex });
+                              }}
                               className="text-muted hover:text-risk"
                             >
                               <Trash2 size={14} />
@@ -189,9 +248,11 @@ export default function CreateExamPage() {
                           )}
                         </div>
                       ))}
-                      <Button type="button" variant="ghost" size="sm" onClick={() => updateQuestion(q.id, { options: [...q.options, ''] })}>
-                        <Plus size={14} /> Option
-                      </Button>
+                      {q.options.length < 6 && (
+                        <Button type="button" variant="ghost" size="sm" onClick={() => updateQuestion(q.id, { options: [...q.options, ''] })}>
+                          <Plus size={14} /> Option
+                        </Button>
+                      )}
                     </div>
                   ) : (
                     <Input

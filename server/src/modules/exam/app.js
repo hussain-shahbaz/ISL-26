@@ -13,6 +13,7 @@ class App {
         role: req.headers['x-user-role'],
         sessionId: req.headers['x-session-id'],
         username: req.headers['x-username'],
+        approvalStatus: req.headers['x-user-approval'] || 'APPROVED',
       };
       next();
     });

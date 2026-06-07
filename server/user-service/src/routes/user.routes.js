@@ -7,6 +7,12 @@ import config from "../config/config.js";
 const userRouter = Router();
 userRouter.post("/register", internalOnly, userController.register);
 userRouter.delete("/:userId", internalOnly, userController.rollback);
+// Internal: auth-service reads approval state to embed in the access token.
+userRouter.get(
+  "/internal/:userId/approval",
+  internalOnly,
+  userController.getApprovalStatus
+);
 userRouter.get("/profile", authenticate, userController.getProfile);
 userRouter.patch(
   "/profile/complete",

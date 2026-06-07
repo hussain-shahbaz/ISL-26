@@ -109,7 +109,7 @@ export default function UsersPage() {
                       {u.approvalStatus.toLowerCase()}
                     </Badge>
                   )}
-                  {tab === 'pending' && (
+                  {u.approvalStatus === 'PENDING' && (
                     <div className="flex gap-2">
                       <Button
                         size="sm"

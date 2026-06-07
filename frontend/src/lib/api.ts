@@ -32,6 +32,15 @@ async function refreshToken(): Promise<string | null> {
   return null;
 }
 
+/** Force-refresh the access token (e.g. after an instructor is approved, so the
+ *  new token carries the updated approval claim instead of waiting for expiry). */
+export async function refreshAccessToken(): Promise<string | null> {
+  refreshing = refreshing || refreshToken();
+  const token = await refreshing;
+  refreshing = null;
+  return token;
+}
+
 api.interceptors.response.use(
   (res) => res,
   async (error: AxiosError) => {
