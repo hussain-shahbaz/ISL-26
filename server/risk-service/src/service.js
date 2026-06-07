@@ -137,6 +137,60 @@ class RiskService {
     };
   }
 
+  // Full node-link graph for visualization: students connected to the devices
+  // and networks they used. Devices/networks touched by 2+ distinct students are
+  // flagged `shared` (the collusion signal). Optionally scoped to one exam.
+  async graph(examId) {
+    const took = examId ? 'WHERE (s)-[:TOOK]->(:Exam {id: $examId})' : '';
+    const rows = await run(
+      `MATCH (s:Student)
+       ${took}
+       OPTIONAL MATCH (s)-[:USED_DEVICE]->(d:Device)
+       OPTIONAL MATCH (s)-[:USED_NETWORK]->(n:Network)
+       RETURN s.id AS student,
+              collect(DISTINCT d.fingerprint) AS devices,
+              collect(DISTINCT n.ip) AS networks`,
+      { examId },
+    );
+
+    const students = new Set();
+    const deviceDegree = new Map();
+    const networkDegree = new Map();
+    const links = [];
+
+    for (const r of rows) {
+      const sid = r.student;
+      if (!sid) continue;
+      students.add(sid);
+      for (const fp of (r.devices || []).filter(Boolean)) {
+        deviceDegree.set(fp, (deviceDegree.get(fp) || 0) + 1);
+        links.push({ source: `s:${sid}`, target: `d:${fp}`, via: 'device' });
+      }
+      for (const ip of (r.networks || []).filter(Boolean)) {
+        networkDegree.set(ip, (networkDegree.get(ip) || 0) + 1);
+        links.push({ source: `s:${sid}`, target: `n:${ip}`, via: 'network' });
+      }
+    }
+
+    // Students attached to any shared resource are themselves implicated.
+    const implicated = new Set();
+    for (const l of links) {
+      const deg = l.via === 'device' ? deviceDegree.get(l.target.slice(2)) : networkDegree.get(l.target.slice(2));
+      if (deg > 1) implicated.add(l.source);
+    }
+
+    const nodes = [];
+    for (const id of students) nodes.push({ id: `s:${id}`, label: id, type: 'student', shared: implicated.has(`s:${id}`) });
+    for (const [fp, deg] of deviceDegree) nodes.push({ id: `d:${fp}`, label: fp, type: 'device', degree: deg, shared: deg > 1 });
+    for (const [ip, deg] of networkDegree) nodes.push({ id: `n:${ip}`, label: ip, type: 'network', degree: deg, shared: deg > 1 });
+
+    return {
+      nodes,
+      links,
+      counts: { students: students.size, devices: deviceDegree.size, networks: networkDegree.size },
+    };
+  }
+
   async overview() {
     const rows = await run(
       `MATCH (s:Student) WITH count(s) AS students

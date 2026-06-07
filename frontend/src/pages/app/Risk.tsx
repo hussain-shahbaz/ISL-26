@@ -1,14 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Network, Users, MonitorSmartphone, ShieldAlert, Workflow } from 'lucide-react';
-import { getRiskOverview, getCollusion, type CollusionRing } from '@/features/risk/api';
+import { getRiskOverview, getCollusion, getRiskGraph, type CollusionRing } from '@/features/risk/api';
 import { PageHeader, StatCard, EmptyState, ErrorState, Skeleton } from '@/components/app/widgets';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { GraphCanvas } from '@/features/risk/GraphCanvas';
 
 export default function RiskPage() {
   const overview = useQuery({ queryKey: ['risk-overview'], queryFn: getRiskOverview });
   const collusion = useQuery({ queryKey: ['risk-collusion'], queryFn: () => getCollusion() });
+  const graph = useQuery({ queryKey: ['risk-graph'], queryFn: () => getRiskGraph() });
 
   const unavailable = overview.isError || collusion.isError;
 
@@ -28,6 +30,32 @@ export default function RiskPage() {
             <StatCard label="Devices" value={overview.data?.devices ?? '—'} icon={MonitorSmartphone} accent="proctor" delay={0.05} />
             <StatCard label="Networks" value={overview.data?.networks ?? '—'} icon={Network} accent="exam" delay={0.1} />
           </div>
+
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Network size={18} className="text-brand" /> Integrity network
+                {graph.data && (
+                  <Badge tone="brand">
+                    {graph.data.nodes.length} nodes · {graph.data.links.length} edges
+                  </Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {graph.isLoading ? (
+                <Skeleton className="h-[420px]" />
+              ) : !graph.data || graph.data.nodes.length === 0 ? (
+                <EmptyState
+                  title="No graph data yet"
+                  description="Once students log in and submit, their device and network links appear here."
+                  icon={Network}
+                />
+              ) : (
+                <GraphCanvas nodes={graph.data.nodes} links={graph.data.links} />
+              )}
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>

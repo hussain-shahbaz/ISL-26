@@ -37,3 +37,28 @@ export async function getCollusion(examId?: string): Promise<CollusionResult> {
   const res = await api.get(`${BASE}/collusion`, { params: examId ? { examId } : undefined });
   return unwrap<CollusionResult>(res.data);
 }
+
+export interface GraphNode {
+  id: string;
+  label: string;
+  type: 'student' | 'device' | 'network';
+  shared?: boolean;
+  degree?: number;
+}
+
+export interface GraphLink {
+  source: string;
+  target: string;
+  via: 'device' | 'network';
+}
+
+export interface RiskGraph {
+  nodes: GraphNode[];
+  links: GraphLink[];
+  counts: RiskOverview;
+}
+
+export async function getRiskGraph(examId?: string): Promise<RiskGraph> {
+  const res = await api.get(`${BASE}/graph`, { params: examId ? { examId } : undefined });
+  return unwrap<RiskGraph>(res.data);
+}

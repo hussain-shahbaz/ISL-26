@@ -62,6 +62,14 @@ router.get('/collusion', async (req, res) => {
   }
 });
 
+router.get('/graph', async (req, res) => {
+  try {
+    ok(res, await riskService.graph(req.query.examId || null));
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
 router.get('/student/:studentId', async (req, res) => {
   try {
     ok(res, await riskService.studentRisk(req.params.studentId));
