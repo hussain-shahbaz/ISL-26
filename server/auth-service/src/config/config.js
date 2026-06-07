@@ -17,5 +17,8 @@ export default {
   Google_Client_Secret: process.env.GMAIL_CLIENT_SECRET || process.env.Google_Client_Secret || "",
   Google_User: process.env.GMAIL_USER || process.env.Google_User || "",
   Google_Refresh_Token: process.env.GMAIL_REFRESH_TOKEN || process.env.Google_Refresh_Token || "",
+  // Email provider preference: Resend (recommended) > Gmail OAuth2 > console (dev).
+  RESEND_API_KEY: process.env.RESEND_API_KEY || "",
+  EMAIL_FROM: process.env.EMAIL_FROM || "",
   USER_SERVICE_URL: process.env.USER_SERVICE_URL || "http://localhost:3002",
 };
