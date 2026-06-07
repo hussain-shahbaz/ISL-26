@@ -43,6 +43,14 @@ class ExamService {
 
     const role = user && user.role;
 
+    // Internal service-to-service call: authenticated by the shared service
+    // secret but with no forwarded user identity (e.g. the grading service).
+    // Return the full exam WITH reference answers so grading can run.
+    if (!role) {
+      const questions = await questionRepository.findByExamId(examId);
+      return { ...exam, questions };
+    }
+
     if (role === 'teacher') {
       if (exam.instructorId !== user.userId) throw new Error('Not authorized');
       const questions = await questionRepository.findByExamId(examId);

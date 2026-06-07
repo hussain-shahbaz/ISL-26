@@ -125,7 +125,12 @@ class StudentExamController {
             const { examId } = req.params;
             // Students may only ever read their own submission; teachers/admins
             // may target a specific student or list all submissions for an exam.
-            const isPrivileged = req.user.role === 'teacher' || req.user.role === 'admin';
+            // A service-secret call with no forwarded user identity (e.g. the
+            // grading service) is treated as an internal privileged reader.
+            const isPrivileged =
+                req.user.role === 'teacher' ||
+                req.user.role === 'admin' ||
+                !req.user.role;
             const studentId = isPrivileged ? req.query.studentId : req.user.userId;
 
             const details = await studentExamService.getSubmissionByExamIdAndStudentId(examId, studentId);
