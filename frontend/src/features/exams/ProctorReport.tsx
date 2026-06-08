@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Eye,
@@ -12,17 +12,25 @@ import {
   CheckCircle2,
   XCircle,
   AlertTriangle,
+  BarChart3,
+  Trophy,
+  TrendingUp,
+  TrendingDown,
+  Copy,
 } from 'lucide-react';
 import {
   getExamSubmissions,
   resolveStudentsByIds,
   getGradingResults,
+  getExamAnalytics,
   startGrading,
   getGradingProgress,
   type Submission,
   type StudentIdentity,
   type StudentResult,
   type QuestionResult,
+  type ExamAnalytics,
+  type ConceptStat,
 } from './api';
 import { examWindow } from './status';
 import { Card, CardContent } from '@/components/ui/card';
@@ -68,6 +76,11 @@ function scoreTone(pct: number): 'integrity' | 'proctor' | 'risk' {
   return 'risk';
 }
 
+// How many of a student's text answers were flagged as likely plagiarism.
+function plagiarismCount(result?: StudentResult): number {
+  return (result?.results ?? []).filter((r) => r.cheatingFlag).length;
+}
+
 // A row in the report: the raw submission joined with the resolved identity and
 // (when available) the grading result.
 interface Row {
@@ -104,6 +117,12 @@ export function ProctorReport({ exam }: { exam: Exam }) {
   const resultsQ = useQuery({
     queryKey: ['exam-results', examId],
     queryFn: () => getGradingResults(examId),
+    enabled: Boolean(examId),
+  });
+
+  const analyticsQ = useQuery({
+    queryKey: ['exam-analytics', examId],
+    queryFn: () => getExamAnalytics(examId),
     enabled: Boolean(examId),
   });
 
@@ -174,8 +193,8 @@ export function ProctorReport({ exam }: { exam: Exam }) {
           clearInterval(id);
           setTaskId(null);
           setGrading(false);
-          await Promise.all([resultsQ.refetch(), submissionsQ.refetch()]);
-          toast.success('Grading complete', 'Scores and feedback are ready.');
+          await Promise.all([resultsQ.refetch(), submissionsQ.refetch(), analyticsQ.refetch()]);
+          toast.success('Grading complete', 'Scores, feedback and analytics are ready.');
         } else if (p.status === 'failed') {
           clearInterval(id);
           setTaskId(null);
@@ -204,7 +223,6 @@ export function ProctorReport({ exam }: { exam: Exam }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submissionsQ.isLoading, resultsQ.isLoading, submissions.length, graded, win.ended]);
 
-  const totalViolations = submissions.reduce((acc, s) => acc + (s.violationCount ?? 0), 0);
   const flagged = submissions.filter((s) => (s.violationCount ?? 0) > 0).length;
   const gradedCount = rows.filter((r) => r.result).length;
   const avgPct =
@@ -213,6 +231,25 @@ export function ProctorReport({ exam }: { exam: Exam }) {
           rows.reduce((acc, r) => acc + (r.result?.percentage ?? 0), 0) / gradedCount,
         )
       : null;
+
+  // "Who cheated" = anyone with proctoring violations and/or plagiarism-flagged
+  // answers. Each cheater carries human-readable reasons for the teacher.
+  const cheaters = useMemo(
+    () =>
+      rows
+        .map((r) => {
+          const vCount = r.submission.violationCount ?? 0;
+          const pCount = plagiarismCount(r.result);
+          const reasons: string[] = [];
+          if (pCount > 0) reasons.push(`${pCount} answer${pCount > 1 ? 's' : ''} flagged for plagiarism`);
+          if (vCount > 0) reasons.push(`${vCount} proctoring alert${vCount > 1 ? 's' : ''}`);
+          return { row: r, vCount, pCount, reasons };
+        })
+        .filter((c) => c.reasons.length > 0)
+        .sort((a, b) => b.pCount * 100 + b.vCount - (a.pCount * 100 + a.vCount)),
+    [rows],
+  );
+  const plagiarisedCount = cheaters.filter((c) => c.pCount > 0).length;
 
   function exportCsv() {
     const header = [
@@ -226,6 +263,8 @@ export function ProctorReport({ exam }: { exam: Exam }) {
       'Percentage',
       'Violations',
       'Violation breakdown',
+      'Plagiarism flags',
+      'Integrity',
     ];
     const body = rows.map((r) => {
       const breakdown = (r.submission.violations ?? []).reduce<Record<string, number>>((acc, v) => {
@@ -235,6 +274,8 @@ export function ProctorReport({ exam }: { exam: Exam }) {
       const breakdownStr = Object.entries(breakdown)
         .map(([t, n]) => `${vLabel(t)} x${n}`)
         .join('; ');
+      const pCount = plagiarismCount(r.result);
+      const vCount = r.submission.violationCount ?? 0;
       return [
         displayName(r),
         r.identity?.email ?? '',
@@ -244,8 +285,10 @@ export function ProctorReport({ exam }: { exam: Exam }) {
         r.result ? String(r.result.totalScore) : '',
         r.result ? String(r.result.totalMarks) : String(exam.totalMarks),
         r.result ? `${Math.round(r.result.percentage)}%` : '',
-        String(r.submission.violationCount ?? 0),
+        String(vCount),
         breakdownStr,
+        String(pCount),
+        pCount > 0 || vCount > 0 ? 'Flagged' : 'Clean',
       ];
     });
     downloadCsv(`${(exam.title || exam.subject).replace(/\s+/g, '_')}_proctor_report.csv`, [
@@ -269,6 +312,7 @@ export function ProctorReport({ exam }: { exam: Exam }) {
               </Badge>
               {avgPct !== null && <Badge tone={scoreTone(avgPct)}>avg {avgPct}%</Badge>}
               <Badge tone={flagged ? 'risk' : 'integrity'}>{flagged} flagged</Badge>
+              {plagiarisedCount > 0 && <Badge tone="risk">{plagiarisedCount} plagiarism</Badge>}
             </div>
           )}
           {submissions.length > 0 && (
@@ -289,6 +333,57 @@ export function ProctorReport({ exam }: { exam: Exam }) {
           )}
         </div>
       </div>
+
+      {analyticsQ.data && (
+        <AnalyticsPanel
+          analytics={analyticsQ.data}
+          questions={exam.questions ?? []}
+          identityById={identityById}
+        />
+      )}
+
+      {cheaters.length > 0 && (
+        <Card className="mb-4 border-risk/30">
+          <CardContent className="p-4">
+            <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold">
+              <ShieldAlert size={16} className="text-risk" /> Flagged for review ({cheaters.length})
+            </h3>
+            <p className="mb-3 text-xs text-muted">
+              Students with proctoring alerts and/or answers flagged as possible plagiarism.
+              Review each before finalizing grades.
+            </p>
+            <div className="space-y-2">
+              {cheaters.map(({ row, vCount, pCount, reasons }) => (
+                <div
+                  key={row.submission._id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-surface-2/30 px-3 py-2"
+                >
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-border bg-surface-2 text-[11px] font-semibold">
+                      {initialsOf(displayName(row))}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{displayName(row)}</p>
+                      <p className="truncate text-xs text-muted">{reasons.join(' · ')}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {pCount > 0 && (
+                      <Badge tone="risk">
+                        <Copy size={12} /> Plagiarism
+                      </Badge>
+                    )}
+                    {vCount > 0 && <Badge tone={riskTone(vCount)}>{vCount} alerts</Badge>}
+                    <Button size="sm" variant="ghost" onClick={() => setActive(row)}>
+                      <FileText size={14} /> Details
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {submissionsQ.isLoading ? (
         <Skeleton className="h-40" />
@@ -317,9 +412,130 @@ export function ProctorReport({ exam }: { exam: Exam }) {
   );
 }
 
+function AnalyticsPanel({
+  analytics,
+  questions,
+  identityById,
+}: {
+  analytics: ExamAnalytics;
+  questions: Question[];
+  identityById: Map<string, StudentIdentity>;
+}) {
+  const qText = new Map(questions.map((q) => [q._id, q.questionText]));
+  const avgPct =
+    analytics.totalMarks > 0 ? Math.round((analytics.avgScore / analytics.totalMarks) * 100) : 0;
+  const nameOf = (id: string) => identityById.get(id)?.name || `Student ${id.slice(0, 8)}`;
+  const conceptLabel = (c: ConceptStat) =>
+    qText.get(c.questionId) || c.topic || `Question ${c.questionId.slice(0, 8)}`;
+
+  const tiles = [
+    { label: 'Average score', value: `${analytics.avgScore}/${analytics.totalMarks}`, tone: scoreTone(avgPct) },
+    { label: 'Average %', value: `${avgPct}%`, tone: scoreTone(avgPct) },
+    { label: 'Students graded', value: String(analytics.totalStudents), tone: 'exam' as const },
+    { label: 'Grading mode', value: analytics.gradingMode ?? '—', tone: 'neutral' as const },
+  ];
+
+  return (
+    <Card className="mb-4">
+      <CardContent className="p-4">
+        <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+          <BarChart3 size={16} className="text-brand" /> Class analytics
+        </h3>
+
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {tiles.map((t) => (
+            <div key={t.label} className="rounded-xl border border-border bg-surface-2/30 px-3 py-2.5">
+              <p className="text-xs uppercase tracking-wide text-muted">{t.label}</p>
+              <p className="mt-0.5 text-lg font-semibold">{t.value}</p>
+            </div>
+          ))}
+        </div>
+
+        {analytics.topStudents.length > 0 && (
+          <div className="mt-4">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
+              <Trophy size={13} className="text-proctor" /> Top performers
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {analytics.topStudents.map((s, i) => (
+                <span
+                  key={s.studentId}
+                  className="inline-flex items-center gap-2 rounded-full border border-border bg-surface-2/40 py-1 pl-2 pr-3 text-sm"
+                >
+                  <span className="grid h-5 w-5 place-items-center rounded-full bg-brand/15 text-[11px] font-semibold text-brand">
+                    {i + 1}
+                  </span>
+                  <span className="font-medium">{nameOf(s.studentId)}</span>
+                  <span className="text-xs text-muted">{s.score} pts</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {(analytics.strongConcepts.length > 0 || analytics.weakConcepts.length > 0) && (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <ConceptList
+              title="Strong areas"
+              icon={<TrendingUp size={13} className="text-integrity" />}
+              concepts={analytics.strongConcepts}
+              label={conceptLabel}
+              tone="integrity"
+            />
+            <ConceptList
+              title="Needs attention"
+              icon={<TrendingDown size={13} className="text-risk" />}
+              concepts={analytics.weakConcepts}
+              label={conceptLabel}
+              tone="risk"
+            />
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ConceptList({
+  title,
+  icon,
+  concepts,
+  label,
+  tone,
+}: {
+  title: string;
+  icon: ReactNode;
+  concepts: ConceptStat[];
+  label: (c: ConceptStat) => string;
+  tone: 'integrity' | 'risk';
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-surface-2/20 p-3">
+      <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
+        {icon} {title}
+      </p>
+      {concepts.length === 0 ? (
+        <p className="text-xs text-muted">No questions in this band.</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {concepts.slice(0, 5).map((c) => (
+            <li key={c.questionId} className="flex items-center justify-between gap-3 text-sm">
+              <span className="min-w-0 truncate" title={label(c)}>
+                {label(c)}
+              </span>
+              <Badge tone={tone}>{Math.round(c.correctPercentage)}%</Badge>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function ReportRow({ row, onView }: { row: Row; onView: () => void }) {
   const { submission: s, identity, result } = row;
   const count = s.violationCount ?? 0;
+  const pCount = plagiarismCount(result);
   const breakdown = (s.violations ?? []).reduce<Record<string, number>>((acc, v) => {
     acc[v.type] = (acc[v.type] ?? 0) + 1;
     return acc;
@@ -363,6 +579,11 @@ function ReportRow({ row, onView }: { row: Row; onView: () => void }) {
             </Badge>
           ) : (
             <Badge tone="neutral">Pending grading</Badge>
+          )}
+          {pCount > 0 && (
+            <Badge tone="risk">
+              <Copy size={12} /> Plagiarism
+            </Badge>
           )}
           <span className={count > 2 ? 'text-risk' : count > 0 ? 'text-proctor' : 'text-integrity'}>
             {count > 0 ? <ShieldAlert size={16} /> : <ShieldCheck size={16} />}

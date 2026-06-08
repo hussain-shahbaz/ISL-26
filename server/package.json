@@ -8,6 +8,7 @@
     "start": "node app.js",
     "dev": "nodemon app.js",
     "health": "node scripts/check-microservices.js",
+    "docs": "node scripts/build-docs.js",
     "test:smoke": "node tests/smoke.test.js",
     "log": "nodemon --env-file=../.env src/modules/log/app.js",
     "exam": "nodemon --env-file=../.env src/modules/exam/server.js",
@@ -33,6 +34,7 @@
     "nodemailer": "^8.0.7",
     "redis": "^6.0.0",
     "resend": "^6.12.3",
+    "swagger-ui-express": "^5.0.1",
     "uuid": "^14.0.0"
   }
 }

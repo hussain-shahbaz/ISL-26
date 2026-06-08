@@ -17,6 +17,7 @@ const CreateExamPage = lazy(() => import('@/pages/app/CreateExam'));
 const SettingsPage = lazy(() => import('@/pages/app/Settings'));
 const ExamRunnerPage = lazy(() => import('@/pages/app/ExamRunner'));
 const ResultsPage = lazy(() => import('@/pages/app/Results'));
+const StudentResultPage = lazy(() => import('@/pages/app/StudentResult'));
 const UsersPage = lazy(() => import('@/pages/app/Users'));
 const AuditPage = lazy(() => import('@/pages/app/Audit'));
 const RiskPage = lazy(() => import('@/pages/app/Risk'));
@@ -65,6 +66,14 @@ export default function App() {
             element={
               <ProtectedRoute roles={['student']}>
                 <ResultsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="results/:id"
+            element={
+              <ProtectedRoute roles={['student']}>
+                <StudentResultPage />
               </ProtectedRoute>
             }
           />

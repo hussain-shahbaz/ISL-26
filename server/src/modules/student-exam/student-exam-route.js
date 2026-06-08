@@ -14,6 +14,8 @@ class StudentExamRoutes {
         this.router.post('/submit/:examId', StudentExamController.submitExam);
         this.router.get('/', StudentExamController.getAllExams);
         // this.router.get('/:id', StudentExamController.getExamDetails);
+        // A student's own graded result (score + feedback, no integrity internals).
+        this.router.get('/my-result/:examId', StudentExamController.getMyResult);
         this.router.get('/result/:examId', StudentExamController.getSubmissionByExamIdAndStudentId);
     }
 

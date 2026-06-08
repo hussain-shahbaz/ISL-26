@@ -120,6 +120,28 @@ class StudentExamController {
         }
     }
 
+    async getMyResult(req, res) {
+        try {
+            const { examId } = req.params;
+            const studentId = req.user.userId; // own result only — taken from JWT
+            const data = await studentExamService.getMyResult(examId, studentId);
+            if (!data) {
+                return res.status(404).json({
+                    status: 'error', error_code: 404,
+                    message: 'No submission found for this exam',
+                    timestamp: new Date().toISOString(),
+                });
+            }
+            return res.status(200).json({
+                status: 'success',
+                message: 'Result fetched successfully',
+                data,
+            });
+        } catch (error) {
+            return fail(res, error);
+        }
+    }
+
     async getSubmissionByExamIdAndStudentId(req, res) {
         try {
             const { examId } = req.params;

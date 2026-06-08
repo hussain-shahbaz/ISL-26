@@ -1,0 +1,687 @@
+// Aggregated OpenAPI 3.0 specification for the whole platform.
+//
+// Every microservice is private (only the gateway is public), so instead of one
+// Swagger page per service we document the *public* surface exposed through the
+// gateway in a single spec. Paths below are exactly what the browser calls
+// (`/api/auth/*` for in-process auth, `/api/modules/<service>/*` for proxied
+// services). Served by Swagger UI at `GET /api/docs/` and as raw JSON at
+// `GET /api/docs.json`.
+
+const bearerAuth = [{ bearerAuth: [] }];
+
+// Reusable parameter helpers
+const examIdQuery = {
+  name: 'examId',
+  in: 'query',
+  required: true,
+  schema: { type: 'string' },
+  description: 'Exam id (Mongo ObjectId).',
+};
+
+const openapi = {
+  openapi: '3.0.3',
+  info: {
+    title: 'ExamPro — Secure Online Examination API',
+    version: '1.0.0',
+    description: [
+      'Public API surface of the microservices platform, exposed through the **API gateway**.',
+      '',
+      '### How routing works',
+      '- `auth-service` runs **in-process** in the gateway → reachable at `/api/auth/*`.',
+      '- Domain services are **reverse-proxied** at `/api/modules/<service>/*`.',
+      '  The gateway strips the `/api/modules/<service>` prefix and forwards to the',
+      "  service's own base path:",
+      '',
+      '| Public prefix | Forwarded to (internal) |',
+      '|---|---|',
+      '| `/api/modules/user` | user-service `/api/users` |',
+      '| `/api/modules/exam` | exam-service `/api/exam` |',
+      '| `/api/modules/student-exam` | student-exam `/api/v1/student-exam` |',
+      '| `/api/modules/grade-cheat` | grade-cheat `/api` |',
+      '| `/api/modules/log` | log-service `/logs` |',
+      '| `/api/modules/risk` | risk-service `/risk` |',
+      '',
+      '### Authentication',
+      'Most routes need a JWT access token: `Authorization: Bearer <token>`. Obtain it',
+      'from `POST /api/auth/login`. The gateway verifies the token **once**, strips any',
+      'client-supplied `x-user-*` headers, and forwards a trusted identity plus an',
+      '`x-service-secret` to the service. Click **Authorize** and paste your access token',
+      'to use *Try it out*. The refresh token is an httpOnly cookie set by the server.',
+      '',
+      '### Response envelopes (not yet unified)',
+      'Different services wrap responses differently — `{ success, data }`,',
+      '`{ status, data, message }`, or a gateway error `{ status, error_code, message, timestamp }`.',
+      'The frontend `unwrap()` tolerates all shapes.',
+    ].join('\n'),
+  },
+  servers: [
+    { url: '/', description: 'Same origin (through Nginx → gateway)' },
+  ],
+  tags: [
+    { name: 'Auth', description: 'Registration, login, sessions, password reset (in-process auth-service).' },
+    { name: 'Users', description: 'Profiles, instructor approval, student lookup (user-service / PostgreSQL).' },
+    { name: 'Exams', description: 'Exam + question CRUD (exam-service / MongoDB).' },
+    { name: 'Student Exam', description: 'Taking and submitting exams (student-exam / MongoDB).' },
+    { name: 'Grade & Cheat', description: 'AI grading + plagiarism (grade-cheat / Celery + Chroma).' },
+    { name: 'Logs', description: 'Tamper-evident audit log (admin only).' },
+    { name: 'Risk', description: 'Integrity / collusion graph analytics (Neo4j).' },
+    { name: 'System', description: 'Health checks.' },
+  ],
+  components: {
+    securitySchemes: {
+      bearerAuth: {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description: 'Access token from `POST /api/auth/login` (15-min HS256 JWT).',
+      },
+    },
+    schemas: {
+      ErrorEnvelope: {
+        type: 'object',
+        properties: {
+          status: { type: 'string', example: 'error' },
+          error_code: { type: 'integer', example: 400 },
+          message: { type: 'string', example: 'Route not found' },
+          timestamp: { type: 'string', format: 'date-time' },
+        },
+      },
+      ServiceError: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean', example: false },
+          error: { type: 'string', example: 'No data found for exam' },
+          statusCode: { type: 'integer', example: 404 },
+        },
+      },
+      RegisterRequest: {
+        type: 'object',
+        required: ['name', 'email', 'password', 'role'],
+        properties: {
+          name: { type: 'string', example: 'Ali Hamdan' },
+          email: { type: 'string', format: 'email', example: 'student@uet.edu.pk' },
+          password: { type: 'string', format: 'password', minLength: 8, example: 'Str0ng#Pass' },
+          role: { type: 'string', enum: ['student', 'instructor'], example: 'student' },
+        },
+      },
+      LoginRequest: {
+        type: 'object',
+        required: ['email', 'password'],
+        properties: {
+          email: { type: 'string', format: 'email', example: 'student@uet.edu.pk' },
+          password: { type: 'string', format: 'password', example: 'Str0ng#Pass' },
+        },
+      },
+      OtpRequest: {
+        type: 'object',
+        required: ['email', 'otp'],
+        properties: {
+          email: { type: 'string', format: 'email' },
+          otp: { type: 'string', example: '123456' },
+        },
+      },
+      EmailOnly: {
+        type: 'object',
+        required: ['email'],
+        properties: { email: { type: 'string', format: 'email' } },
+      },
+      ResetPasswordRequest: {
+        type: 'object',
+        required: ['email', 'password'],
+        properties: {
+          email: { type: 'string', format: 'email' },
+          password: { type: 'string', format: 'password', minLength: 8 },
+        },
+      },
+      ChangePasswordRequest: {
+        type: 'object',
+        required: ['currentPassword', 'newPassword'],
+        properties: {
+          currentPassword: { type: 'string', format: 'password' },
+          newPassword: { type: 'string', format: 'password', minLength: 8 },
+        },
+      },
+      AccessTokenResponse: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean', example: true },
+          data: { type: 'string', description: 'Access token (JWT). Refresh token is set as an httpOnly cookie.' },
+        },
+      },
+      MeResponse: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean', example: true },
+          data: {
+            type: 'object',
+            properties: {
+              userId: { type: 'string', format: 'uuid' },
+              email: { type: 'string', format: 'email' },
+              role: { type: 'string', enum: ['student', 'instructor', 'admin'] },
+              name: { type: 'string' },
+            },
+          },
+        },
+      },
+      UserProfile: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          name: { type: 'string' },
+          email: { type: 'string', format: 'email' },
+          role: { type: 'string', enum: ['STUDENT', 'INSTRUCTOR', 'ADMIN'] },
+          university: { type: 'string', nullable: true },
+          approvalStatus: { type: 'string', enum: ['PENDING', 'APPROVED', 'REJECTED'] },
+          department: { type: 'string', nullable: true },
+          rollNo: { type: 'string', nullable: true },
+        },
+      },
+      ApprovalRequest: {
+        type: 'object',
+        required: ['status'],
+        properties: { status: { type: 'string', enum: ['APPROVED', 'REJECTED'] } },
+      },
+      ResolveIdsRequest: {
+        type: 'object',
+        required: ['ids'],
+        properties: {
+          ids: { type: 'array', items: { type: 'string', format: 'uuid' }, maxItems: 500 },
+        },
+      },
+      Question: {
+        type: 'object',
+        properties: {
+          _id: { type: 'string' },
+          examId: { type: 'string' },
+          type: { type: 'string', enum: ['mcq', 'text'] },
+          questionText: { type: 'string' },
+          imageUrl: { type: 'string', nullable: true },
+          options: { type: 'array', items: { type: 'string' }, description: 'MCQ only.' },
+          marks: { type: 'number' },
+          referenceAnswer: {
+            type: 'string',
+            description: 'Correct answer. **Stripped** from responses sent to students.',
+          },
+        },
+      },
+      ExamCreateRequest: {
+        type: 'object',
+        required: ['title', 'subject', 'instructorId'],
+        properties: {
+          title: { type: 'string', example: 'Information Security — Midterm' },
+          subject: { type: 'string', example: 'Information Security' },
+          teacherName: { type: 'string' },
+          scheduledTime: { type: 'string', format: 'date-time', nullable: true, description: 'Optional for drafts.' },
+          timeAllowed: { type: 'integer', description: 'Minutes.', example: 60 },
+          totalMarks: { type: 'number', example: 50 },
+          students: { type: 'array', items: { type: 'string', format: 'uuid' }, description: 'Enrolled userIds.' },
+          instructorId: { type: 'string', format: 'uuid' },
+          status: { type: 'string', enum: ['draft', 'saved', 'published', 'submitted', 'checked'], default: 'draft' },
+          questions: { type: 'array', items: { $ref: '#/components/schemas/Question' } },
+        },
+      },
+      Exam: {
+        allOf: [
+          { $ref: '#/components/schemas/ExamCreateRequest' },
+          {
+            type: 'object',
+            properties: {
+              _id: { type: 'string' },
+              submitted: { type: 'boolean', description: 'Per-student flag (student list only).' },
+              submittedAt: { type: 'string', format: 'date-time', nullable: true },
+            },
+          },
+        ],
+      },
+      StatusUpdateRequest: {
+        type: 'object',
+        required: ['status'],
+        properties: { status: { type: 'string', enum: ['draft', 'saved', 'published', 'submitted', 'checked'] } },
+      },
+      SubmitExamRequest: {
+        type: 'object',
+        required: ['answers'],
+        properties: {
+          answers: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['questionId', 'submittedAnswer'],
+              properties: {
+                questionId: { type: 'string' },
+                submittedAnswer: { type: 'string' },
+              },
+            },
+          },
+          violations: {
+            type: 'array',
+            description: 'Proctoring events captured client-side.',
+            items: {
+              type: 'object',
+              properties: {
+                type: { type: 'string', example: 'tab-hidden' },
+                label: { type: 'string' },
+                at: { type: 'string', format: 'date-time' },
+              },
+            },
+          },
+        },
+      },
+      Submission: {
+        type: 'object',
+        properties: {
+          examId: { type: 'string' },
+          studentId: { type: 'string', format: 'uuid', description: 'Taken from the JWT, never the body.' },
+          answers: { type: 'array', items: { $ref: '#/components/schemas/SubmittedAnswer' } },
+          status: { type: 'string', enum: ['pending_grading', 'graded'] },
+          submittedAt: { type: 'string', format: 'date-time' },
+        },
+      },
+      SubmittedAnswer: {
+        type: 'object',
+        properties: {
+          questionId: { type: 'string' },
+          submittedAnswer: { type: 'string' },
+          score: { type: 'number', nullable: true },
+          feedback: { type: 'string', nullable: true },
+          plagiarismScore: { type: 'number', nullable: true },
+        },
+      },
+      GradingTaskAccepted: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean', example: true },
+          data: {
+            type: 'object',
+            properties: {
+              taskId: { type: 'string', example: 'a1b2c3d4' },
+              status: { type: 'string', example: 'queued' },
+            },
+          },
+        },
+      },
+      GradingProgress: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean' },
+          data: {
+            type: 'object',
+            properties: {
+              status: { type: 'string', enum: ['queued', 'in_progress', 'completed', 'failed'] },
+              progress: { type: 'number', description: '0–100.' },
+              graded: { type: 'integer' },
+              total: { type: 'integer' },
+            },
+          },
+        },
+      },
+      RiskEventRequest: {
+        type: 'object',
+        required: ['type', 'studentId'],
+        properties: {
+          type: { type: 'string', enum: ['login', 'submission'] },
+          studentId: { type: 'string', format: 'uuid' },
+          deviceFingerprint: { type: 'string', description: 'SHA-256 hash, not raw device data.' },
+          ip: { type: 'string' },
+          examId: { type: 'string' },
+        },
+      },
+      LogEntry: {
+        type: 'object',
+        properties: {
+          service: { type: 'string' },
+          environment: { type: 'string' },
+          eventType: { type: 'string', enum: ['REQUEST', 'RESPONSE'] },
+          requestId: { type: 'string' },
+          userId: { type: 'string', nullable: true },
+          timestamp: { type: 'string', format: 'date-time' },
+          previousHash: { type: 'string' },
+          currentHash: { type: 'string', description: 'SHA256(previousHash + entry) — hash chain.' },
+        },
+      },
+    },
+  },
+  paths: {
+    '/health': {
+      get: {
+        tags: ['System'],
+        summary: 'Gateway health',
+        security: [],
+        responses: { 200: { description: 'Gateway is healthy.' } },
+      },
+    },
+
+    // ----- Auth -----
+    '/api/auth/register': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Start registration (emails an OTP)',
+        security: [],
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/RegisterRequest' } } } },
+        responses: { 200: { description: 'OTP emailed; temp data stored in Redis.' }, 400: { description: 'Validation error.' } },
+      },
+    },
+    '/api/auth/verify-email': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Confirm OTP → create auth record + profile',
+        security: [],
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/OtpRequest' } } } },
+        responses: { 200: { description: 'Account verified.' }, 400: { description: 'Wrong/expired OTP.' } },
+      },
+    },
+    '/api/auth/request-otp': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Resend verification OTP (rate-limited)',
+        security: [],
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/EmailOnly' } } } },
+        responses: { 200: { description: 'OTP resent (cooldown/limits apply).' } },
+      },
+    },
+    '/api/auth/login': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Login → access token (+ refresh cookie, single active session)',
+        security: [],
+        parameters: [
+          { name: 'x-device-fingerprint', in: 'header', required: false, schema: { type: 'string' }, description: 'Client device fingerprint (hashed server-side).' },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/LoginRequest' } } } },
+        responses: {
+          200: { description: 'Access token issued.', content: { 'application/json': { schema: { $ref: '#/components/schemas/AccessTokenResponse' } } } },
+          401: { description: 'Bad credentials.' },
+          409: { description: 'Already logged in on another device.' },
+        },
+      },
+    },
+    '/api/auth/refresh': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Mint a new access token from the refresh cookie',
+        security: [],
+        responses: { 200: { description: 'New access token.', content: { 'application/json': { schema: { $ref: '#/components/schemas/AccessTokenResponse' } } } }, 401: { description: 'Invalid/expired refresh token.' } },
+      },
+    },
+    '/api/auth/logout': {
+      post: { tags: ['Auth'], summary: 'Revoke session + blacklist access token (jti)', security: bearerAuth, responses: { 200: { description: 'Logged out.' } } },
+    },
+    '/api/auth/logout-all': {
+      post: { tags: ['Auth'], summary: 'Revoke all sessions for the user', security: bearerAuth, responses: { 200: { description: 'All sessions revoked.' } } },
+    },
+    '/api/auth/me': {
+      get: { tags: ['Auth'], summary: 'Current user (no password hash)', security: bearerAuth, responses: { 200: { description: 'Current user.', content: { 'application/json': { schema: { $ref: '#/components/schemas/MeResponse' } } } }, 401: { description: 'Unauthenticated.' } } },
+    },
+    '/api/auth/sessions': {
+      get: { tags: ['Auth'], summary: 'List active sessions (no token hashes)', security: bearerAuth, responses: { 200: { description: 'Sessions.' } } },
+    },
+    '/api/auth/forgot-password': {
+      post: { tags: ['Auth'], summary: 'Email a reset OTP (no account enumeration)', security: [], requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/EmailOnly' } } } }, responses: { 200: { description: 'Generic success message regardless of existence.' } } },
+    },
+    '/api/auth/verify-reset-otp': {
+      post: { tags: ['Auth'], summary: 'Verify reset OTP', security: [], requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/OtpRequest' } } } }, responses: { 200: { description: 'OTP verified.' } } },
+    },
+    '/api/auth/reset-password': {
+      post: { tags: ['Auth'], summary: 'Set a new password (requires verified reset OTP)', security: [], requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/ResetPasswordRequest' } } } }, responses: { 200: { description: 'Password updated.' } } },
+    },
+    '/api/auth/change-password': {
+      post: { tags: ['Auth'], summary: 'Change password while logged in', security: bearerAuth, requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/ChangePasswordRequest' } } } }, responses: { 200: { description: 'Password changed.' } } },
+    },
+
+    // ----- Users -----
+    '/api/modules/user/me': {
+      get: { tags: ['Users'], summary: 'Own profile', security: bearerAuth, responses: { 200: { description: 'Profile.', content: { 'application/json': { schema: { $ref: '#/components/schemas/UserProfile' } } } } } },
+    },
+    '/api/modules/user/instructors/pending': {
+      get: { tags: ['Users'], summary: 'Instructors awaiting approval (admin)', security: bearerAuth, responses: { 200: { description: 'Pending instructors.' }, 403: { description: 'Admin only.' } } },
+    },
+    '/api/modules/user/instructors': {
+      get: { tags: ['Users'], summary: 'All instructors (admin)', security: bearerAuth, responses: { 200: { description: 'Instructors.' }, 403: { description: 'Admin only.' } } },
+    },
+    '/api/modules/user/students': {
+      get: { tags: ['Users'], summary: 'All students (admin)', security: bearerAuth, responses: { 200: { description: 'Students.' }, 403: { description: 'Admin only.' } } },
+    },
+    '/api/modules/user/{id}/approval': {
+      patch: {
+        tags: ['Users'],
+        summary: 'Approve / reject an instructor (admin)',
+        security: bearerAuth,
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/ApprovalRequest' } } } },
+        responses: { 200: { description: 'Updated.' }, 403: { description: 'Admin only.' } },
+      },
+    },
+    '/api/modules/user/students/resolve-ids': {
+      post: {
+        tags: ['Users'],
+        summary: 'Resolve student UUIDs → names/emails/rollNos (teacher/admin)',
+        security: bearerAuth,
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/ResolveIdsRequest' } } } },
+        responses: { 200: { description: 'Resolved student identities.' }, 403: { description: 'Teacher/admin only.' } },
+      },
+    },
+
+    // ----- Exams -----
+    '/api/modules/exam/': {
+      post: {
+        tags: ['Exams'],
+        summary: 'Create an exam (approved teacher)',
+        security: bearerAuth,
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/ExamCreateRequest' } } } },
+        responses: { 201: { description: 'Exam created.', content: { 'application/json': { schema: { $ref: '#/components/schemas/Exam' } } } }, 400: { description: 'Validation error.' }, 403: { description: 'Not an approved teacher.' } },
+      },
+      get: {
+        tags: ['Exams'],
+        summary: "List the teacher's exams",
+        security: bearerAuth,
+        parameters: [{ name: 'subject', in: 'query', schema: { type: 'string' } }],
+        responses: { 200: { description: 'Exams.', content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/Exam' } } } } } },
+      },
+    },
+    '/api/modules/exam/student': {
+      get: { tags: ['Exams'], summary: 'Exams assigned to the student', security: bearerAuth, responses: { 200: { description: 'Assigned exams (with per-student submission state).' } } },
+    },
+    '/api/modules/exam/{id}': {
+      get: {
+        tags: ['Exams'],
+        summary: 'Exam + questions (referenceAnswer stripped for students)',
+        security: bearerAuth,
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'Exam.', content: { 'application/json': { schema: { $ref: '#/components/schemas/Exam' } } } }, 404: { description: 'Not found.' } },
+      },
+      patch: {
+        tags: ['Exams'],
+        summary: 'Update an exam (owner teacher)',
+        security: bearerAuth,
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { content: { 'application/json': { schema: { $ref: '#/components/schemas/ExamCreateRequest' } } } },
+        responses: { 200: { description: 'Updated.' }, 403: { description: 'Not the owner.' } },
+      },
+      delete: {
+        tags: ['Exams'],
+        summary: 'Delete an exam (owner teacher)',
+        security: bearerAuth,
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'Deleted.' } },
+      },
+    },
+    '/api/modules/exam/{id}/status': {
+      patch: {
+        tags: ['Exams'],
+        summary: 'Change exam status (draft → published → …)',
+        security: bearerAuth,
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/StatusUpdateRequest' } } } },
+        responses: { 200: { description: 'Status updated.' } },
+      },
+    },
+    '/api/modules/exam/question/{examId}': {
+      get: {
+        tags: ['Exams'],
+        summary: 'Questions for an exam',
+        security: bearerAuth,
+        parameters: [{ name: 'examId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'Questions.', content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/Question' } } } } } },
+      },
+      post: {
+        tags: ['Exams'],
+        summary: 'Add a question to an exam (owner teacher)',
+        security: bearerAuth,
+        parameters: [{ name: 'examId', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/Question' } } } },
+        responses: { 201: { description: 'Question created.' } },
+      },
+    },
+
+    // ----- Student Exam -----
+    '/api/modules/student-exam/': {
+      get: { tags: ['Student Exam'], summary: 'Exams known to the student', security: bearerAuth, responses: { 200: { description: 'Exams.' } } },
+    },
+    '/api/modules/student-exam/submit/{examId}': {
+      post: {
+        tags: ['Student Exam'],
+        summary: 'Submit an attempt (studentId from JWT; one submission per student)',
+        security: bearerAuth,
+        parameters: [{ name: 'examId', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/SubmitExamRequest' } } } },
+        responses: {
+          201: { description: 'Submitted.', content: { 'application/json': { schema: { $ref: '#/components/schemas/Submission' } } } },
+          409: { description: 'Already submitted (unique {examId, studentId}).' },
+        },
+      },
+    },
+    '/api/modules/student-exam/my-result/{examId}': {
+      get: {
+        tags: ['Student Exam'],
+        summary: "A student's own graded result (score + feedback, no integrity internals)",
+        description:
+          'Returns the calling student\'s submission joined with grading output. Plagiarism / cheating signals are stripped — students see scores and feedback only. 404 if they never submitted.',
+        security: bearerAuth,
+        parameters: [{ name: 'examId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          200: { description: 'Own result (status, answers, per-question scores/feedback, own violations).' },
+          404: { description: 'No submission for this exam.' },
+        },
+      },
+    },
+    '/api/modules/student-exam/result/{examId}': {
+      get: {
+        tags: ['Student Exam'],
+        summary: 'Read a submission/result',
+        description: 'Students read **their own**; teachers/admins may pass `?studentId=`.',
+        security: bearerAuth,
+        parameters: [
+          { name: 'examId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'studentId', in: 'query', required: false, schema: { type: 'string', format: 'uuid' }, description: 'Privileged roles only.' },
+        ],
+        responses: { 200: { description: 'Submission/result.', content: { 'application/json': { schema: { $ref: '#/components/schemas/Submission' } } } } },
+      },
+    },
+
+    // ----- Grade & Cheat (teacher/admin) -----
+    '/api/modules/grade-cheat/grade/async': {
+      post: {
+        tags: ['Grade & Cheat'],
+        summary: 'Enqueue grading for an exam (returns taskId)',
+        security: bearerAuth,
+        parameters: [
+          examIdQuery,
+          { name: 'mode', in: 'query', schema: { type: 'string', enum: ['strict', 'medium', 'lenient'], default: 'medium' } },
+          { name: 'instructions', in: 'query', schema: { type: 'string' }, description: 'Optional extra grading instructions.' },
+        ],
+        responses: { 202: { description: 'Task enqueued.', content: { 'application/json': { schema: { $ref: '#/components/schemas/GradingTaskAccepted' } } } }, 409: { description: 'Already grading/graded.' } },
+      },
+    },
+    '/api/modules/grade-cheat/grade/progress': {
+      get: {
+        tags: ['Grade & Cheat'],
+        summary: 'Poll grading progress',
+        security: bearerAuth,
+        parameters: [{ name: 'taskId', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'Progress.', content: { 'application/json': { schema: { $ref: '#/components/schemas/GradingProgress' } } } } },
+      },
+    },
+    '/api/modules/grade-cheat/grade/cleanup': {
+      delete: {
+        tags: ['Grade & Cheat'],
+        summary: 'Delete a grading task + release its lock',
+        security: bearerAuth,
+        parameters: [{ name: 'taskId', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'Cleaned up.' } },
+      },
+    },
+    '/api/modules/grade-cheat/results': {
+      get: { tags: ['Grade & Cheat'], summary: 'Stored grading results for an exam', security: bearerAuth, parameters: [examIdQuery], responses: { 200: { description: 'Results.' } } },
+    },
+    '/api/modules/grade-cheat/analytics': {
+      get: { tags: ['Grade & Cheat'], summary: 'Class analytics for an exam', security: bearerAuth, parameters: [examIdQuery], responses: { 200: { description: 'Analytics.' } } },
+    },
+    '/api/modules/grade-cheat/tasks': {
+      get: { tags: ['Grade & Cheat'], summary: 'Grading tasks for an exam', security: bearerAuth, parameters: [examIdQuery], responses: { 200: { description: 'Tasks.' } } },
+    },
+    '/api/modules/grade-cheat/health': {
+      get: { tags: ['System'], summary: 'grade-cheat liveness', security: [], responses: { 200: { description: 'Healthy.' } } },
+    },
+
+    // ----- Logs (admin) -----
+    '/api/modules/log/logs': {
+      get: {
+        tags: ['Logs'],
+        summary: 'Query audit logs (admin)',
+        security: bearerAuth,
+        parameters: [
+          { name: 'service', in: 'query', schema: { type: 'string' } },
+          { name: 'eventType', in: 'query', schema: { type: 'string', enum: ['REQUEST', 'RESPONSE'] } },
+          { name: 'errorOnly', in: 'query', schema: { type: 'boolean' } },
+          { name: 'requestId', in: 'query', schema: { type: 'string' } },
+          { name: 'startTime', in: 'query', schema: { type: 'string', format: 'date-time' } },
+          { name: 'endTime', in: 'query', schema: { type: 'string', format: 'date-time' } },
+        ],
+        responses: { 200: { description: 'Logs.', content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/LogEntry' } } } } }, 403: { description: 'Admin only.' } },
+      },
+    },
+    '/api/modules/log/logs/verify': {
+      get: {
+        tags: ['Logs'],
+        summary: 'Verify the SHA-256 hash-chain integrity (admin)',
+        security: bearerAuth,
+        parameters: [{ name: 'service', in: 'query', schema: { type: 'string' } }],
+        responses: { 200: { description: 'Chain status (valid or first break index).' } },
+      },
+    },
+
+    // ----- Risk (teacher/admin) -----
+    '/api/modules/risk/events': {
+      post: {
+        tags: ['Risk'],
+        summary: 'Ingest an integrity event (login/submission)',
+        security: bearerAuth,
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/RiskEventRequest' } } } },
+        responses: { 200: { description: 'Event ingested (idempotent MERGE).' } },
+      },
+    },
+    '/api/modules/risk/overview': {
+      get: { tags: ['Risk'], summary: 'Counts (students/devices/networks)', security: bearerAuth, responses: { 200: { description: 'Overview.' } } },
+    },
+    '/api/modules/risk/collusion': {
+      get: { tags: ['Risk'], summary: 'Collusion pairs + rings', security: bearerAuth, parameters: [{ name: 'examId', in: 'query', schema: { type: 'string' } }], responses: { 200: { description: 'Pairs and connected-component rings.' } } },
+    },
+    '/api/modules/risk/graph': {
+      get: { tags: ['Risk'], summary: 'Node-link integrity graph for visualization', security: bearerAuth, parameters: [{ name: 'examId', in: 'query', schema: { type: 'string' } }], responses: { 200: { description: '{ nodes, links, counts } for the in-app force-directed graph.' } } },
+    },
+    '/api/modules/risk/student/{studentId}': {
+      get: {
+        tags: ['Risk'],
+        summary: 'Per-student risk profile/score',
+        security: bearerAuth,
+        parameters: [{ name: 'studentId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { 200: { description: 'Risk profile.' } },
+      },
+    },
+    '/api/modules/risk/health': {
+      get: { tags: ['System'], summary: 'risk-service liveness', security: [], responses: { 200: { description: 'Healthy.' } } },
+    },
+  },
+};
+
+module.exports = openapi;

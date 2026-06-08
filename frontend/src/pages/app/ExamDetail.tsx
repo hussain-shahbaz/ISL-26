@@ -110,7 +110,7 @@ export default function ExamDetailPage() {
               <Play size={16} /> Enter exam
             </Button>
           ) : studentState === 'submitted' ? (
-            <Button variant="outline" onClick={() => navigate('/app/results')}>
+            <Button variant="outline" onClick={() => navigate(`/app/results/${exam._id}`)}>
               <CheckCircle2 size={16} /> View result
             </Button>
           ) : (
@@ -175,8 +175,8 @@ export default function ExamDetailPage() {
                 </p>
               </div>
             </div>
-            <Button variant="outline" onClick={() => navigate('/app/results')}>
-              View results
+            <Button variant="outline" onClick={() => navigate(`/app/results/${exam._id}`)}>
+              View result
             </Button>
           </CardContent>
         </Card>

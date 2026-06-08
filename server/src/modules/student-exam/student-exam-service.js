@@ -2,7 +2,7 @@ const studentExamRepository = require('./student-exam-repository');
 const SubmitExamValidator = require('./student-exam-validator');
 const dataProvider = require('./data-provider');
 const { emitSubmission } = require('./risk-provider');
-const { triggerGrading } = require('./grade-provider');
+const { triggerGrading, fetchExamResults } = require('./grade-provider');
 
 class StudentExamService {
   // The exam-service enforces published/started/enrolled rules for students.
@@ -79,6 +79,60 @@ class StudentExamService {
       return studentExamRepository.findByExamIdAndStudentId(examId, studentId);
     }
     return studentExamRepository.findAllByExamId(examId);
+  }
+
+  // A student's own result: their submission joined with the grading output (if the
+  // exam has been graded). Plagiarism / integrity internals are intentionally
+  // stripped — a student sees their score and feedback, never the cheating signals
+  // (those are teacher/admin only). Returns null if they never submitted.
+  async getMyResult(examId, studentId) {
+    const submission = await studentExamRepository.findByExamIdAndStudentId(examId, studentId);
+    if (!submission) return null;
+
+    // Exam + questions (referenceAnswer already stripped by exam-service for
+    // students). Optional: degrade gracefully if it can't be fetched.
+    let exam = null;
+    let questions = [];
+    try {
+      const data = await dataProvider.getExamForStudent(examId, studentId);
+      exam = data.exam;
+      questions = data.questions || [];
+    } catch {
+      /* show the result even if exam/question text can't be loaded */
+    }
+
+    const results = await fetchExamResults(examId);
+    const mine = Array.isArray(results)
+      ? results.find((r) => String(r.studentId) === String(studentId))
+      : null;
+
+    const result = mine
+      ? {
+          totalScore: mine.totalScore,
+          totalMarks: mine.totalMarks,
+          percentage: mine.percentage,
+          gradedAt: mine.gradedAt,
+          results: (mine.results || []).map((q) => ({
+            questionId: q.questionId,
+            score: q.score,
+            maxMarks: q.maxMarks,
+            isCorrect: q.isCorrect,
+            feedback: q.feedback,
+          })),
+        }
+      : null;
+
+    return {
+      examId,
+      status: result ? 'graded' : submission.status,
+      submittedAt: submission.submittedAt,
+      answers: submission.answers,
+      violations: submission.violations,
+      violationCount: submission.violationCount,
+      totalMarks: exam ? exam.totalMarks : result ? result.totalMarks : null,
+      questions,
+      result,
+    };
   }
 
   _isWithinWindow(exam, at) {

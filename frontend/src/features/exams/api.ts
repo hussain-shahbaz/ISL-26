@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { api, unwrap } from '@/lib/api';
-import type { Exam, SubmissionAnswer } from '@/types';
+import type { Exam, Question, SubmissionAnswer } from '@/types';
 
 const MODULES = '/modules';
 
@@ -223,19 +223,70 @@ export async function getGradingProgress(taskId: string): Promise<GradingProgres
   return res.data as GradingProgress;
 }
 
+// Per-question concept performance across the cohort.
+export interface ConceptStat {
+  questionId: string;
+  topic?: string;
+  correctPercentage: number;
+  marks: number;
+}
+
+// Matches the grade-cheat analytics document (analytics/analyzer.py).
 export interface ExamAnalytics {
-  averageScore?: number;
-  averagePercentage?: number;
-  highestScore?: number;
-  lowestScore?: number;
-  totalStudents?: number;
-  flaggedCount?: number;
+  examId: string;
+  gradingMode?: string;
+  totalStudents: number;
+  avgScore: number;
+  totalMarks: number;
+  topStudents: { studentId: string; score: number }[];
+  strongConcepts: ConceptStat[];
+  weakConcepts: ConceptStat[];
+  generatedAt?: string;
 }
 
 export async function getExamAnalytics(examId: string): Promise<ExamAnalytics | null> {
   try {
     const res = await api.get(`${MODULES}/grade-cheat/analytics`, { params: { examId } });
     return unwrap<ExamAnalytics>(res.data) ?? null;
+  } catch (err) {
+    if (axios.isAxiosError(err) && err.response?.status === 404) return null;
+    throw err;
+  }
+}
+
+// ---- Student: own result (score + feedback only; no integrity internals) ----
+
+export interface MyQuestionResult {
+  questionId: string;
+  score: number;
+  maxMarks: number;
+  isCorrect?: boolean;
+  feedback?: string;
+}
+
+export interface MyExamResult {
+  examId: string;
+  status: 'pending_grading' | 'graded';
+  submittedAt: string;
+  totalMarks: number | null;
+  answers?: { questionId: string; submittedAnswer: string }[];
+  violations?: { type: string; at: string }[];
+  violationCount?: number;
+  questions?: Question[];
+  result: {
+    totalScore: number;
+    totalMarks: number;
+    percentage: number;
+    gradedAt?: string;
+    results: MyQuestionResult[];
+  } | null;
+}
+
+// A student's own result. 404 (never submitted) is surfaced as null.
+export async function getMyResult(examId: string): Promise<MyExamResult | null> {
+  try {
+    const res = await api.get(`${MODULES}/student-exam/my-result/${examId}`);
+    return unwrap<MyExamResult>(res.data);
   } catch (err) {
     if (axios.isAxiosError(err) && err.response?.status === 404) return null;
     throw err;
